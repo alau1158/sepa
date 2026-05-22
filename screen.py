@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import sys
+
+import pandas as pd
+from dotenv import load_dotenv
+
+from minervini.data import get_tickers, download_data, save_cache, load_cache
+from minervini.screener import screen_stocks
+from minervini.emailer import send_email
+
+load_dotenv()
+
+
+def parse_recipients(raw):
+    recipients = []
+    for part in raw.split(","):
+        part = part.split("#")[0].strip()
+        if part:
+            recipients.append(part)
+    return recipients
+
+
+def main():
+    parser = argparse.ArgumentParser(description="SEPA Stage 2 Stock Screener (Minervini)")
+    parser.add_argument("-sp500", action="store_true", help="Screen S&P 500")
+    parser.add_argument("-sp400", action="store_true", help="Screen S&P 400")
+    parser.add_argument("-sp600", action="store_true", help="Screen S&P 600")
+    parser.add_argument("-all", action="store_true", help="Screen all indices")
+    parser.add_argument("--no-email", action="store_true", help="Print results to console only")
+    parser.add_argument("--output", type=str, help="Save results to CSV file")
+    parser.add_argument("--refresh", action="store_true", help="Force re-download data")
+    args = parser.parse_args()
+
+    indices = []
+    if args.all or args.sp500:
+        indices.append("sp500")
+    if args.all or args.sp400:
+        indices.append("sp400")
+    if args.all or args.sp600:
+        indices.append("sp600")
+
+    if not indices:
+        parser.print_help()
+        sys.exit(1)
+
+    all_results = []
+
+    for index in indices:
+        print(f"\n=== Screening {index.upper()} ===")
+
+        cache = None if args.refresh else load_cache(index)
+
+        if cache:
+            data_dict = cache["data"]
+        else:
+            print("  Fetching ticker list...")
+            try:
+                tickers = get_tickers(index)
+            except Exception as e:
+                print(f"  Error fetching {index} tickers: {e}")
+                continue
+
+            if not tickers:
+                print(f"  No tickers found for {index}, skipping.")
+                continue
+
+            print(f"  Found {len(tickers)} stocks. Downloading data (this may take a while)...")
+            data_dict, failed = download_data(tickers)
+            print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)")
+            save_cache(index, tickers, data_dict, failed)
+
+        print("  Running screener...")
+        results = screen_stocks(data_dict)
+
+        if not results.empty:
+            print(f"  {len(results)} stocks passed all 8 criteria:")
+            print(results.to_string(index=False))
+            all_results.append(results)
+        else:
+            print("  No stocks passed.")
+
+    if not all_results:
+        print("\nNo stocks passed the screen.")
+        return
+
+    combined = pd.concat(all_results, ignore_index=True)
+
+    if args.output:
+        combined.to_csv(args.output, index=False)
+        print(f"\nResults saved to {args.output}")
+
+    if not args.no_email:
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_pass = os.getenv("SMTP_PASSWORD")
+        raw_rcpt = os.getenv("RECIPIENTS", "")
+
+        if smtp_user and smtp_pass and raw_rcpt:
+            recipients = parse_recipients(raw_rcpt)
+            if recipients:
+                smtp_config = {"user": smtp_user, "password": smtp_pass}
+                print(f"\nSending email to {len(recipients)} recipient(s)...")
+                try:
+                    send_email(combined, indices, smtp_config, recipients)
+                    print("Email sent!")
+                except Exception as e:
+                    print(f"Failed to send email: {e}")
+                    print("\n=== Results ===")
+                    print(combined.to_string(index=False))
+            else:
+                print("\nNo valid recipients found in .env. Printing results:")
+                print(combined.to_string(index=False))
+        else:
+            print("\nSMTP not configured (check .env). Printing results:")
+            print(combined.to_string(index=False))
+    else:
+        print("\n=== Final Results ===")
+        print(combined.to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()
