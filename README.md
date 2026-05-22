@@ -43,19 +43,21 @@ python screen.py -sp500 --refresh
 
 ## Output Columns
 
-| Column | Description |
-|--------|-------------|
-| Ticker | Stock symbol (clickable TradingView link in email) |
-| Price | Current closing price |
-| vs 50 SMA% | % distance from 50-day SMA (positive = above) |
-| ATR% | 22-day Average True Range as % of price |
-| VCP | Volatility Contraction Pattern status: VCP Tight, VCP Forming, No VCP |
-| VCP Score | 0–100 contraction confidence score (≥60 Tight, ≥45 Forming, <45 None) |
-| A/D | Accumulation/Distribution rating (A/B/C/D/E) from 65-day price/volume |
-| EPS | EPS Rating — YoY quarterly earnings growth percentile (1–99) |
-| Ind Rk | Industry group RS rank (e.g. `3/70` = 3rd out of 70 groups) |
-| Next Earnings | Upcoming earnings report date |
-| RS Rating | Relative Strength percentile (1–99) |
+Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is better** for Ind Rk. **A is better than E** for A/D.
+
+| Column | Direction | Description |
+|--------|-----------|-------------|
+| Ticker | — | Stock symbol (clickable TradingView link in email) |
+| Price | — | Current closing price |
+| vs 50 SMA% | — | % distance from 50-day SMA (positive = above) |
+| ATR% | — | 22-day Average True Range as % of price |
+| VCP | Higher better | Volatility Contraction Pattern: VCP Tight / Forming / None |
+| VCP Score | Higher better | 0–100 contraction confidence (≥60 Tight, ≥45 Forming, <45 None) |
+| A/D | A > E | Accumulation/Distribution (A=strong buying, E=strong selling) |
+| EPS | Higher better | Earnings Per Share growth percentile (1–99) |
+| Ind Rk | Lower better | Industry group RS rank (e.g. `3/70` = 3rd out of 70 groups) |
+| Next Earnings | — | Upcoming earnings report date |
+| RS Rating | Higher better | Relative Strength percentile (1–99) |
 
 ### VCP Scoring Breakdown (max 100 pts)
 
