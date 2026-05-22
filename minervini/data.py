@@ -101,7 +101,7 @@ def save_cache(index, tickers, data, failed=None):
         pickle.dump(cache, f)
 
 
-def load_cache(index, max_age_hours=24):
+def load_cache(index, max_age_hours=6):
     try:
         with open(CACHE_FILE.format(index), "rb") as f:
             cache = pickle.load(f)
