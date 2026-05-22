@@ -62,9 +62,13 @@ def build_html_table(df, indices):
 def _build_csv(df):
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(df.columns.tolist())
+    cols = df.columns.tolist()
+    writer.writerow(cols)
     for _, row in df.iterrows():
-        writer.writerow(row.tolist())
+        vals = row.tolist()
+        ticker = vals[0]
+        vals[0] = f'=HYPERLINK("https://www.tradingview.com/chart/?symbol={ticker}","{ticker}")'
+        writer.writerow(vals)
     return out.getvalue()
 
 
