@@ -48,14 +48,46 @@ python screen.py -sp500 --refresh
 | Ticker | Stock symbol (clickable TradingView link in email) |
 | Price | Current closing price |
 | vs 50 SMA% | % distance from 50-day SMA (positive = above) |
-| SMA50 | 50-day simple moving average |
-| SMA150 | 150-day simple moving average |
-| SMA200 | 200-day simple moving average |
-| ATR(22) | 22-day Average True Range |
-| VCP | Volatility Contraction Pattern status (VCP Tight / VCP Forming / No VCP) |
-| VCP Score | 0–100 contraction confidence score |
+| ATR% | 22-day Average True Range as % of price |
+| VCP | Volatility Contraction Pattern status: VCP Tight, VCP Forming, No VCP |
+| VCP Score | 0–100 contraction confidence score (≥60 Tight, ≥45 Forming, <45 None) |
+| A/D | Accumulation/Distribution rating (A/B/C/D/E) from 65-day price/volume |
+| EPS | EPS Rating — YoY quarterly earnings growth percentile (1–99) |
+| Ind Rk | Industry group RS rank (e.g. `3/70` = 3rd out of 70 groups) |
 | Next Earnings | Upcoming earnings report date |
 | RS Rating | Relative Strength percentile (1–99) |
+
+### VCP Scoring Breakdown (max 100 pts)
+
+| Component | Max Pts | Method |
+|-----------|---------|--------|
+| Range contraction | 50 | 5-window ~10d splits, progressive tightening checks |
+| Volume dry-up | 25 | 5-window volume decline check |
+| Breakout | 25 | Price above base high + volume confirmation + extension |
+
+### A/D Rating Thresholds
+
+| Rating | Net 65-day Score | Meaning |
+|--------|-----------------|---------|
+| A | ≥ +25 | Strong accumulation (institutional buying) |
+| B | +10 to +24 | Moderate accumulation |
+| C | -9 to +9 | Neutral |
+| D | -10 to -24 | Moderate distribution |
+| E | ≤ -25 | Strong distribution (institutional selling) |
+
+### EPS Rating
+
+- YoY growth of latest quarterly Diluted EPS vs same quarter one year ago
+- Negative-to-positive turnarounds scored as 999% growth
+- Ranked 1–99 among all tickers in the screened universe
+- Stocks with 2+ consecutive negative quarters or missing data are skipped
+
+### Industry RS Rank
+
+- Groups all stocks in the screened universe by yfinance `industry`
+- Computes average RS Rating per industry group
+- Ranks groups by average RS (1 = strongest)
+- Groups with fewer than 3 stocks are excluded
 
 ## Email Setup
 
@@ -73,9 +105,27 @@ RECIPIENTS=email1@example.com,email2@example.com
 
 ## Caching
 
-- Downloaded data is cached to `cache_sp500.pkl`, `cache_sp400.pkl`, `cache_sp600.pkl`
-- Cache expires after 24 hours
-- Use `--refresh` to force re-download
+| Cache | File | Expiry |
+|-------|------|--------|
+| Price data | `cache_{index}.pkl` | 6 hours |
+| Fundamentals (industries, EPS, earnings) | `cache_fundamentals.pkl` | Industries: 7 days, EPS: 24h, Earnings: 24h |
+
+Use `--refresh` to force re-download price data. Delete `cache_fundamentals.pkl` manually to reset fundamental data.
+
+## Project Structure
+
+```
+minervini/
+  data.py         — Ticker sources, yfinance download, pickle cache
+  indicators.py   — SMAs, ATR, 52w metrics, A/D Rating
+  rs_rating.py    — IBD-style RS percentile (40/20/20/20 weighting)
+  vcp.py          — VCP detection (5-window swing-based)
+  screener.py     — Filter + enrichment orchestration
+  earnings.py     — Next earnings date from yfinance calendar
+  fundamentals.py — Industry RS rank + EPS Rating (cached)
+  emailer.py      — HTML table with TradingView links, Gmail SMTP
+screen.py         — CLI entry point with argparse
+```
 
 ## Requirements
 
