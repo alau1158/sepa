@@ -48,6 +48,9 @@ python screen.py -sp500 --refresh
 | Ticker | Stock symbol (clickable TradingView link in email) |
 | Price | Current closing price |
 | vs 50 SMA% | % distance from 50-day SMA (positive = above) |
+| SMA50 | 50-day simple moving average |
+| SMA150 | 150-day simple moving average |
+| SMA200 | 200-day simple moving average |
 | ATR(22) | 22-day Average True Range |
 | VCP | Volatility Contraction Pattern status (VCP Tight / VCP Forming / No VCP) |
 | VCP Score | 0–100 contraction confidence score |

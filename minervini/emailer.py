@@ -13,6 +13,9 @@ def build_html_table(df, indices):
         ticker = row["Ticker"]
         price = row["Price"]
         vs_50 = row.get("vs_50_SMA%", "")
+        sma50 = row.get("SMA50", "")
+        sma150 = row.get("SMA150", "")
+        sma200 = row.get("SMA200", "")
         atr = row.get("ATR_22", "")
         vcp_status = row.get("VCP_Status", "")
         vcp_score = row.get("VCP_Score", "")
@@ -23,6 +26,9 @@ def build_html_table(df, indices):
             <td><a href="https://www.tradingview.com/chart/?symbol={ticker}">{ticker}</a></td>
             <td>{price}</td>
             <td>{vs_50}%</td>
+            <td>{sma50}</td>
+            <td>{sma150}</td>
+            <td>{sma200}</td>
             <td>{atr}</td>
             <td>{vcp_status}</td>
             <td>{vcp_score}</td>
@@ -36,7 +42,7 @@ def build_html_table(df, indices):
         <p>Date: {date_str} | Universe: {index_str} | Passing: {len(df)} stocks</p>
         <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
             <tr style="background: #2c3e50; color: white;">
-                <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>ATR(22)</th>
+                <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>SMA50</th><th>SMA150</th><th>SMA200</th><th>ATR(22)</th>
                 <th>VCP</th><th>VCP Score</th><th>Next Earnings</th><th>RS Rating</th>
             </tr>
             {rows_html}
