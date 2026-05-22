@@ -79,23 +79,19 @@ def compute_ad_rating(df):
         vol = df["Volume"].iloc[i]
         if chg > 0 and vol > avg_vol:
             scores.append(1)
-        elif chg > 0 and vol > avg_vol * 0.8:
-            scores.append(0)
         elif chg < 0 and vol > avg_vol:
             scores.append(-1)
-        elif chg < 0 and vol > avg_vol * 0.8:
-            scores.append(0)
         else:
             scores.append(0)
 
     total = sum(scores)
-    if total >= 25:
+    if total >= 7:
         letter = "A"
-    elif total >= 10:
+    elif total >= 3:
         letter = "B"
-    elif total >= -10:
+    elif total >= -3:
         letter = "C"
-    elif total >= -25:
+    elif total >= -7:
         letter = "D"
     else:
         letter = "E"

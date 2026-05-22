@@ -69,13 +69,13 @@ Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is 
 
 ### A/D Rating Thresholds
 
-| Rating | Net 65-day Score | Meaning |
-|--------|-----------------|---------|
-| A | ≥ +25 | Strong accumulation (institutional buying) |
-| B | +10 to +24 | Moderate accumulation |
-| C | -9 to +9 | Neutral |
-| D | -10 to -24 | Moderate distribution |
-| E | ≤ -25 | Strong distribution (institutional selling) |
+| Rating | Net 65-day Score | S&P 500 Distribution | Meaning |
+|--------|-----------------|---------------------|---------|
+| A | ≥ +7 | ~5% | Strong accumulation (institutional buying) |
+| B | +3 to +6 | ~18% | Moderate accumulation |
+| C | -3 to +2 | ~52% | Neutral |
+| D | -7 to -4 | ~17% | Moderate distribution |
+| E | ≤ -8 | ~8% | Strong distribution (institutional selling) |
 
 ### EPS Rating
 
