@@ -1,5 +1,4 @@
 import smtplib
-import csv
 import io
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -61,14 +60,14 @@ def build_html_table(df, indices):
 
 def _build_csv(df):
     out = io.StringIO()
-    writer = csv.writer(out)
     cols = df.columns.tolist() + ["Link"]
-    writer.writerow(cols)
+    out.write(",".join(cols) + "\n")
     for _, row in df.iterrows():
-        vals = row.tolist()
+        vals = [str(v) if v is not None else "" for v in row.tolist()]
         ticker = vals[0]
-        vals.append(f"https://www.tradingview.com/chart/?symbol={ticker}")
-        writer.writerow(vals)
+        url = f"https://www.tradingview.com/chart/?symbol={ticker}"
+        vals.append(f'=HYPERLINK("{url}")')
+        out.write(",".join(vals) + "\n")
     return out.getvalue()
 
 
