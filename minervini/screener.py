@@ -68,4 +68,5 @@ def screen_stocks(data_dict):
         earnings_date = earn.get_next_earnings(ticker)
         df_results.at[idx, "Next_Earnings"] = earnings_date
 
+    df_results = df_results.sort_values("RS_Rating", ascending=False).reset_index(drop=True)
     return df_results
