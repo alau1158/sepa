@@ -1,3 +1,6 @@
+import pandas as pd
+
+
 def compute_weighted_return(df):
     closes = df["Close"]
     current = closes.iloc[-1]
@@ -9,6 +12,9 @@ def compute_weighted_return(df):
     close_6m = closes.iloc[-126]
     close_9m = closes.iloc[-189]
     close_12m = closes.iloc[-252]
+
+    if any(pd.isna(x) for x in [close_3m, close_6m, close_9m, close_12m, current]):
+        return None
 
     ret_3m = (current - close_3m) / close_3m * 100
     ret_6m = (current - close_6m) / close_6m * 100
@@ -22,7 +28,7 @@ def compute_rs_ratings(data_dict):
     returns = {}
     for ticker, df in data_dict.items():
         ret = compute_weighted_return(df)
-        if ret is not None:
+        if ret is not None and not pd.isna(ret):
             returns[ticker] = ret
 
     if not returns:
