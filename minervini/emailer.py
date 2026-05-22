@@ -1,6 +1,10 @@
 import smtplib
+import csv
+import io
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime
 
 
@@ -55,15 +59,34 @@ def build_html_table(df, indices):
     return html
 
 
-def send_email(df, indices, smtp_config, recipients):
-    html = build_html_table(df, indices)
+def _build_csv(df):
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(df.columns.tolist())
+    for _, row in df.iterrows():
+        writer.writerow(row.tolist())
+    return out.getvalue()
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"SEPA Screener Results - {datetime.now().strftime('%Y-%m-%d')}"
+
+def send_email(df, indices, smtp_config, recipients):
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    html = build_html_table(df, indices)
+    csv_data = _build_csv(df)
+
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = f"SEPA Screener Results - {date_str}"
     msg["From"] = smtp_config["user"]
     msg["To"] = ", ".join(recipients)
 
-    msg.attach(MIMEText(html, "html"))
+    body = MIMEMultipart("alternative")
+    body.attach(MIMEText(html, "html"))
+    msg.attach(body)
+
+    csv_part = MIMEBase("text", "csv")
+    csv_part.set_payload(csv_data)
+    encoders.encode_base64(csv_part)
+    csv_part.add_header("Content-Disposition", "attachment", filename=f"sepa_results_{date_str}.csv")
+    msg.attach(csv_part)
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
