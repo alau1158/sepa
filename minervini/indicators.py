@@ -64,4 +64,5 @@ def compute_atr_value(df, period=22):
     atr = compute_atr(df, period)
     if pd.isna(atr.iloc[-1]):
         return None
-    return round(atr.iloc[-1], 2)
+    pct = (atr.iloc[-1] / df["Close"].iloc[-1]) * 100
+    return round(pct, 2)

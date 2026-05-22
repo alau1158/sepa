@@ -31,19 +31,13 @@ def screen_stocks(data_dict):
                 vs_50 = ind.price_distance_from_sma(df, 50)
                 atr_val = ind.compute_atr_value(df, 22)
                 rs_val = rs_ratings.get(ticker, 0)
-                sma50 = round(ind.compute_sma(df["Close"], 50).iloc[-1], 2) if len(df) >= 50 else None
-                sma150 = round(ind.compute_sma(df["Close"], 150).iloc[-1], 2) if len(df) >= 150 else None
-                sma200 = round(ind.compute_sma(df["Close"], 200).iloc[-1], 2) if len(df) >= 200 else None
 
                 results.append(
                     {
                         "Ticker": ticker,
                         "Price": price,
                         "vs_50_SMA%": round(vs_50, 2) if vs_50 is not None else None,
-                        "SMA50": sma50,
-                        "SMA150": sma150,
-                        "SMA200": sma200,
-                        "ATR_22": atr_val,
+                        "ATR%": atr_val,
                         "VCP_Status": None,
                         "VCP_Score": None,
                         "Next_Earnings": None,
