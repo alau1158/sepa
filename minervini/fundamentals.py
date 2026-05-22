@@ -4,6 +4,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
+import pandas as pd
 import yfinance as yf
 
 CACHE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,30 +78,82 @@ def _get_industry(ticker):
         return None
 
 
-def compute_industry_ranks(tickers, rs_ratings, industries):
-    groups = {}
-    for t in tickers:
+def compute_industry_ranks(all_tickers, passing_tickers, rs_ratings, industries):
+    """Rank industries by the max RS of PASSING tickers (Minervini bottom-up).
+
+    Only industries with ≥1 passing ticker are ranked.
+    Returns dict[ticker] -> (rank, total_industries).
+    """
+    passing_set = set(passing_tickers)
+    ind_max_rs = {}
+    for t in passing_tickers:
         ind = industries.get(t)
         if not ind:
             continue
         rs = rs_ratings.get(t)
         if rs is None:
             continue
-        groups.setdefault(ind, []).append(rs)
+        prev = ind_max_rs.get(ind, 0)
+        if rs > prev:
+            ind_max_rs[ind] = rs
 
-    avg_rs = {ind: np.mean(vals) for ind, vals in groups.items() if len(vals) >= 3}
-    sorted_inds = sorted(avg_rs, key=avg_rs.get, reverse=True)
+    sorted_inds = sorted(ind_max_rs, key=ind_max_rs.get, reverse=True)
     rank_map = {ind: i + 1 for i, ind in enumerate(sorted_inds)}
     total = len(sorted_inds)
 
     ticker_ranks = {}
-    for t in tickers:
+    for t in all_tickers:
         ind = industries.get(t)
         if ind and ind in rank_map:
             ticker_ranks[t] = (rank_map[ind], total)
         else:
             ticker_ranks[t] = (None, None)
     return ticker_ranks
+
+
+def compute_breakout_order(passing_tickers, data_dict, industries):
+    """Within each industry, rank passing stocks by breakout timing.
+
+    Breakout date = earliest day in the last 4 weeks where price crossed
+    above its 20-day high on >1.2× average volume.  First to break out = 1.
+    Returns dict[ticker] -> (order, total_in_industry).
+    """
+    groups = {}
+    for t in passing_tickers:
+        ind = industries.get(t)
+        if not ind:
+            continue
+        df = data_dict.get(t)
+        if df is None or len(df) < 30:
+            continue
+        close = df["Close"]
+        high_20 = df["High"].rolling(20).max().shift()
+        avg_vol = df["Volume"].rolling(50).mean().shift()
+        breakout_day = None
+        for i in range(-29, 0):
+            if (close.iloc[i] > high_20.iloc[i]
+                    and df["Volume"].iloc[i] > avg_vol.iloc[i] * 1.2
+                    and not pd.isna(high_20.iloc[i])
+                    and not pd.isna(avg_vol.iloc[i])):
+                breakout_day = df.index[i]
+                break
+        groups.setdefault(ind, []).append((t, breakout_day))
+
+    order_map = {}
+    for ind, members in groups.items():
+        valid = [(t, d) for t, d in members if d is not None]
+        valid.sort(key=lambda x: x[1])
+        total = len(valid)
+        for i, (t, _) in enumerate(valid, 1):
+            order_map[t] = (i, total)
+        for t, d in members:
+            if d is None:
+                order_map[t] = ("N/A", total)
+
+    result = {}
+    for t in passing_tickers:
+        result[t] = order_map.get(t, ("N/A", 0))
+    return result
 
 
 def get_eps_data(tickers, force_refresh=False):

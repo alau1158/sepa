@@ -25,6 +25,10 @@ def build_html_table(df, indices):
         ind_rank = row.get("Ind_Rank", "")
         earnings = row.get("Next_Earnings", "")
         rs = row.get("RS_Rating", "")
+        rs_trend = row.get("RS_Trend", "")
+        rs_div = row.get("RS_Div", "")
+        corr_div = row.get("Corr_Div", "")
+        brk_order = row.get("Brk_Order", "")
 
         rows_html += f"""<tr>
             <td><a href="https://www.tradingview.com/chart/?symbol={ticker}">{ticker}</a></td>
@@ -38,6 +42,10 @@ def build_html_table(df, indices):
             <td>{ind_rank}</td>
             <td>{earnings}</td>
             <td>{rs}</td>
+            <td>{rs_trend}</td>
+            <td>{rs_div}</td>
+            <td>{corr_div}</td>
+            <td>{brk_order}</td>
         </tr>"""
 
     html = f"""<html>
@@ -48,6 +56,7 @@ def build_html_table(df, indices):
             <tr style="background: #2c3e50; color: white;">
                 <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>ATR(22)%</th>
                 <th>VCP</th><th>Score</th><th>A/D</th><th>EPS</th><th>Ind Rk</th><th>Next Earnings</th><th>RS</th>
+                <th>RS Trend</th><th>RS Div</th><th>Corr Div</th><th>Brk Order</th>
             </tr>
             {rows_html}
         </table>

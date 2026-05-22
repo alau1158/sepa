@@ -86,6 +86,39 @@ def download_data(tickers, period="2y", batch_size=100):
     return all_data, failed
 
 
+SPY_CACHE_FILE = os.path.join(CACHE_DIR, "cache_spy.pkl")
+
+
+def get_benchmark(period="2y", force_refresh=False):
+    """Download SPY data (cached 6h)."""
+    if not force_refresh:
+        try:
+            with open(SPY_CACHE_FILE, "rb") as f:
+                cache = pickle.load(f)
+            age = (datetime.now() - cache["timestamp"]).total_seconds() / 3600
+            if age <= 6:
+                print("  Using cached SPY data")
+                return cache["data"]
+            else:
+                print(f"  SPY cache expired ({age:.1f}h), re-downloading...")
+        except (FileNotFoundError, Exception):
+            pass
+
+    print("  Downloading SPY...")
+    data = yf.download("SPY", period=period, auto_adjust=True, progress=False)
+    if isinstance(data.columns, pd.MultiIndex):
+        has_ticker_level = "SPY" in data.columns.get_level_values(0)
+        if has_ticker_level:
+            data = data["SPY"]
+        else:
+            data.columns = data.columns.swaplevel()
+            data = data["SPY"]
+    cache = {"data": data, "timestamp": datetime.now()}
+    with open(SPY_CACHE_FILE, "wb") as f:
+        pickle.dump(cache, f)
+    return data
+
+
 CACHE_FILE = os.path.join(CACHE_DIR, "cache_{}.pkl")
 
 

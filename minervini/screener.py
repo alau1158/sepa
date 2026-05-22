@@ -11,6 +11,7 @@ def screen_stocks(data_dict):
     rs_ratings = rsr.compute_rs_ratings(data_dict)
 
     all_tickers = list(data_dict.keys())
+    spy_df = data_dict.get("SPY")
 
     results = []
     for ticker, df in data_dict.items():
@@ -37,6 +38,16 @@ def screen_stocks(data_dict):
 
                 ad_letter, ad_score = ind.compute_ad_rating(df)
 
+                rs_div = "N/A"
+                rs_trend = "N/A"
+                corr_div = "N/A"
+                if spy_df is not None and ticker != "SPY":
+                    rs_line = ind.compute_rs_line(df["Close"], spy_df["Close"])
+                    rs_trend_bool, rs_slope = ind.check_rs_line_trend(rs_line, 65)
+                    rs_trend = "Up" if rs_trend_bool else "Down"
+                    rs_div = ind.check_rs_divergence(rs_line, df["Close"], 65)
+                    corr_div = ind.check_correction_divergence(df, spy_df, 5)
+
                 results.append(
                     {
                         "Ticker": ticker,
@@ -50,6 +61,10 @@ def screen_stocks(data_dict):
                         "Ind_Rank": None,
                         "Next_Earnings": None,
                         "RS_Rating": rs_val,
+                        "RS_Trend": rs_trend,
+                        "RS_Div": rs_div,
+                        "Corr_Div": corr_div,
+                        "Brk_Order": None,
                     }
                 )
         except Exception:
@@ -59,7 +74,6 @@ def screen_stocks(data_dict):
         return pd.DataFrame()
 
     df_results = pd.DataFrame(results)
-
     passing_tickers = df_results["Ticker"].tolist()
 
     for idx, row in df_results.iterrows():
@@ -75,15 +89,28 @@ def screen_stocks(data_dict):
         df_results.at[idx, "Next_Earnings"] = earnings_cache.get(ticker, "N/A")
 
     industries = fund.get_industries(all_tickers)
-    ind_ranks = fund.compute_industry_ranks(all_tickers, rs_ratings, industries)
+    ind_ranks = fund.compute_industry_ranks(
+        all_tickers, passing_tickers, rs_ratings, industries
+    )
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]
         rank_info = ind_ranks.get(ticker, (None, None))
         rank, total = rank_info
         if rank is not None:
-            df_results.at[idx, "Ind_Rank"] = rank
+            df_results.at[idx, "Ind_Rank"] = f"{rank}/{total}"
         else:
             df_results.at[idx, "Ind_Rank"] = "N/A"
+
+    breakout_order = fund.compute_breakout_order(
+        passing_tickers, data_dict, industries
+    )
+    for idx, row in df_results.iterrows():
+        ticker = row["Ticker"]
+        order, total = breakout_order.get(ticker, ("N/A", 0))
+        if order != "N/A":
+            df_results.at[idx, "Brk_Order"] = f"{order}/{total}"
+        else:
+            df_results.at[idx, "Brk_Order"] = "N/A"
 
     eps_data = fund.get_eps_data(passing_tickers)
     eps_ratings = fund.compute_eps_ratings(passing_tickers, eps_data)

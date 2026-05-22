@@ -29,8 +29,16 @@ def detect_vcp(df):
         thresh = 0.88 + (i - 1) * 0.03
         if ranges[i] < ranges[i - 1] * thresh:
             rc += 1
+
+    if ranges[4] <= min(ranges[:4]) * 1.02:
+        rc += 1
+
     avg_first_two = (ranges[0] + ranges[1]) / 2
     avg_last_two = (ranges[3] + ranges[4]) / 2
+
+    if avg_last_two < avg_first_two:
+        rc += 1
+
     if avg_last_two < avg_first_two * 0.75 and ranges[4] < ranges[3] * 1.10:
         rc += 1
     score += rc * 10
@@ -47,11 +55,25 @@ def detect_vcp(df):
 
     base_high = formation["High"].max()
     action_close = action["Close"].iloc[-1]
+    action_vol = action["Volume"].mean()
+    formation_vol = formation["Volume"].mean()
+
+    avg_daily_range = (formation["High"] - formation["Low"]).mean()
+    avg_daily_range_pct = avg_daily_range / formation["Close"].mean() * 100
+    power_day = any(
+        (r["High"] - r["Low"]) / r["Close"] * 100 > avg_daily_range_pct * 2
+        and r["Close"] > r["High"] * 0.90
+        for _, r in action.iterrows()
+    )
+    action_sma5 = action["Close"].mean()
+    if power_day and action_close > action_sma5:
+        score += 10
+
+    if action_vol > formation_vol * 1.2:
+        score += 10
 
     if action_close > base_high:
         score += 10
-        if action["Volume"].mean() > formation["Volume"].mean() * 1.2:
-            score += 10
         if action_close >= base_high * 1.02:
             score += 5
 

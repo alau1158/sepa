@@ -58,6 +58,18 @@ Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is 
 | Ind Rk | Lower better | Industry group RS rank (e.g. `3/70` = 3rd out of 70 groups) |
 | Next Earnings | — | Upcoming earnings report date |
 | RS Rating | Higher better | Relative Strength percentile (1–99) |
+| RS Trend | Up preferred | RS line (stock/SPY ratio) 65-day direction |
+| RS Div | Yes preferred | RS line made a new 13d high before price did (bullish divergence) |
+| Corr Div | Strong preferred | Stock held up better than market during SPY corrections ≥5% |
+| Brk Order | 1 or 2 preferred | Breakout timing rank within industry (e.g. `1/3` = first to break out) |
+
+### Minervini Context for New Columns
+
+For a stock showing strong relative and institutional characteristics, look for:
+- **RS Trend**: `Up`
+- **RS Div**: `Yes` or `Partial` — stock strengthening versus market before price confirms
+- **Corr Div**: `Strong` or `Moderate` — stock holds up better than SPY during corrections
+- **Brk Order**: `1` or `2` — first to break out in its industry group (industry leadership)
 
 ### VCP Scoring Breakdown (max 100 pts)
 
@@ -87,9 +99,22 @@ Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is 
 ### Industry RS Rank
 
 - Groups all stocks in the screened universe by yfinance `industry`
-- Computes average RS Rating per industry group
-- Ranks groups by average RS (1 = strongest)
-- Groups with fewer than 3 stocks are excluded
+- Ranks groups by the **top RS Rating among passing tickers** in that industry (Minervini bottom-up approach)
+- Only industries with at least 1 passing stock are ranked
+- Higher rank (1 = strongest) = the industry contains at least one very strong relative performer
+
+### Breakout Order
+
+- Within each industry, passing stocks are ordered by when they broke out above their 20-day high on >1.2× average volume
+- The stock that breaks out earliest gets rank `1`
+- First movers in an industry tend to be the leaders
+
+### RS Line & Market Divergence
+
+- **RS Line** = stock close / SPY close, measuring relative strength versus the broad market
+- **RS Trend** checks whether the RS line's 65-day slope is positive (Up) or negative (Down)
+- **RS Divergence** detects when the RS line makes a new 13-day high while price does not — a bullish signal that institutional money is quietly accumulating
+- **Market Correction Divergence** looks at SPY 5%+ corrections and checks if the stock made higher lows during those declines, indicating the stock is under accumulation relative to the market
 
 ## Email Setup
 

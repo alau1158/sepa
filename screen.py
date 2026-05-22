@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 from dotenv import load_dotenv
 
-from minervini.data import get_tickers, download_data, save_cache, load_cache
+from minervini.data import get_tickers, download_data, save_cache, load_cache, get_benchmark
 from minervini.screener import screen_stocks
 from minervini.emailer import send_email
 
@@ -45,6 +45,7 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    spy_data = get_benchmark(force_refresh=args.refresh)
     all_results = []
 
     for index in indices:
@@ -71,6 +72,7 @@ def main():
             print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)")
             save_cache(index, tickers, data_dict, failed)
 
+        data_dict["SPY"] = spy_data
         print("  Running screener...")
         results = screen_stocks(data_dict)
 
