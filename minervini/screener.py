@@ -45,7 +45,7 @@ def screen_stocks(data_dict):
                         "ATR%": atr_val,
                         "VCP_Status": None,
                         "VCP_Score": None,
-                        "A/D": ad_letter,
+                        "AD": ad_letter,
                         "EPS_Rating": None,
                         "Ind_Rank": None,
                         "Next_Earnings": None,
@@ -81,7 +81,7 @@ def screen_stocks(data_dict):
         rank_info = ind_ranks.get(ticker, (None, None))
         rank, total = rank_info
         if rank is not None:
-            df_results.at[idx, "Ind_Rank"] = f"{rank}/{total}"
+            df_results.at[idx, "Ind_Rank"] = rank
         else:
             df_results.at[idx, "Ind_Rank"] = "N/A"
 

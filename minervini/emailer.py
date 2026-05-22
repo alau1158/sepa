@@ -20,7 +20,7 @@ def build_html_table(df, indices):
         atr = row.get("ATR%", "")
         vcp_status = row.get("VCP_Status", "")
         vcp_score = row.get("VCP_Score", "")
-        ad = row.get("A/D", "")
+        ad = row.get("AD", "")
         eps = row.get("EPS_Rating", "")
         ind_rank = row.get("Ind_Rank", "")
         earnings = row.get("Next_Earnings", "")
