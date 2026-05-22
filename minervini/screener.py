@@ -46,7 +46,6 @@ def screen_stocks(data_dict):
                         "VCP_Status": None,
                         "VCP_Score": None,
                         "A/D": ad_letter,
-                        "A/D_Score": ad_score,
                         "EPS_Rating": None,
                         "Ind_Rank": None,
                         "Next_Earnings": None,
