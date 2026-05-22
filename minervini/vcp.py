@@ -59,7 +59,7 @@ def detect_vcp(df):
 
     if score >= 60:
         status = "VCP Tight"
-    elif score >= 30:
+    elif score >= 45:
         status = "VCP Forming"
     else:
         status = "No VCP"

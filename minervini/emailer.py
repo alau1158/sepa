@@ -16,6 +16,9 @@ def build_html_table(df, indices):
         atr = row.get("ATR%", "")
         vcp_status = row.get("VCP_Status", "")
         vcp_score = row.get("VCP_Score", "")
+        ad = row.get("A/D", "")
+        eps = row.get("EPS_Rating", "")
+        ind_rank = row.get("Ind_Rank", "")
         earnings = row.get("Next_Earnings", "")
         rs = row.get("RS_Rating", "")
 
@@ -26,6 +29,9 @@ def build_html_table(df, indices):
             <td>{atr}%</td>
             <td>{vcp_status}</td>
             <td>{vcp_score}</td>
+            <td>{ad}</td>
+            <td>{eps}</td>
+            <td>{ind_rank}</td>
             <td>{earnings}</td>
             <td>{rs}</td>
         </tr>"""
@@ -37,7 +43,7 @@ def build_html_table(df, indices):
         <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
             <tr style="background: #2c3e50; color: white;">
                 <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>ATR(22)%</th>
-                <th>VCP</th><th>VCP Score</th><th>Next Earnings</th><th>RS Rating</th>
+                <th>VCP</th><th>Score</th><th>A/D</th><th>EPS</th><th>Ind Rk</th><th>Next Earnings</th><th>RS</th>
             </tr>
             {rows_html}
         </table>

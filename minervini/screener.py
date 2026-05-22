@@ -4,10 +4,13 @@ from . import indicators as ind
 from . import rs_rating as rsr
 from . import vcp as vcp_module
 from . import earnings as earn
+from . import fundamentals as fund
 
 
 def screen_stocks(data_dict):
     rs_ratings = rsr.compute_rs_ratings(data_dict)
+
+    all_tickers = list(data_dict.keys())
 
     results = []
     for ticker, df in data_dict.items():
@@ -32,6 +35,8 @@ def screen_stocks(data_dict):
                 atr_val = ind.compute_atr_value(df, 22)
                 rs_val = rs_ratings.get(ticker, 0)
 
+                ad_letter, ad_score = ind.compute_ad_rating(df)
+
                 results.append(
                     {
                         "Ticker": ticker,
@@ -40,6 +45,10 @@ def screen_stocks(data_dict):
                         "ATR%": atr_val,
                         "VCP_Status": None,
                         "VCP_Score": None,
+                        "A/D": ad_letter,
+                        "A/D_Score": ad_score,
+                        "EPS_Rating": None,
+                        "Ind_Rank": None,
                         "Next_Earnings": None,
                         "RS_Rating": rs_val,
                     }
@@ -52,6 +61,8 @@ def screen_stocks(data_dict):
 
     df_results = pd.DataFrame(results)
 
+    passing_tickers = df_results["Ticker"].tolist()
+
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]
         df = data_dict[ticker]
@@ -59,8 +70,27 @@ def screen_stocks(data_dict):
         df_results.at[idx, "VCP_Status"] = status
         df_results.at[idx, "VCP_Score"] = score
 
-        earnings_date = earn.get_next_earnings(ticker)
-        df_results.at[idx, "Next_Earnings"] = earnings_date
+    earnings_cache = earn.get_earnings_cache(passing_tickers)
+    for idx, row in df_results.iterrows():
+        ticker = row["Ticker"]
+        df_results.at[idx, "Next_Earnings"] = earnings_cache.get(ticker, "N/A")
+
+    industries = fund.get_industries(all_tickers)
+    ind_ranks = fund.compute_industry_ranks(all_tickers, rs_ratings, industries)
+    for idx, row in df_results.iterrows():
+        ticker = row["Ticker"]
+        rank_info = ind_ranks.get(ticker, (None, None))
+        rank, total = rank_info
+        if rank is not None:
+            df_results.at[idx, "Ind_Rank"] = f"{rank}/{total}"
+        else:
+            df_results.at[idx, "Ind_Rank"] = "N/A"
+
+    eps_data = fund.get_eps_data(passing_tickers)
+    eps_ratings = fund.compute_eps_ratings(passing_tickers, eps_data)
+    for idx, row in df_results.iterrows():
+        ticker = row["Ticker"]
+        df_results.at[idx, "EPS_Rating"] = eps_ratings.get(ticker)
 
     df_results = df_results.sort_values("RS_Rating", ascending=False).reset_index(drop=True)
     return df_results

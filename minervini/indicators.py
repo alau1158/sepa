@@ -66,3 +66,37 @@ def compute_atr_value(df, period=22):
         return None
     pct = (atr.iloc[-1] / df["Close"].iloc[-1]) * 100
     return round(pct, 2)
+
+
+def compute_ad_rating(df):
+    if len(df) < 65:
+        return "C", 0
+
+    avg_vol = df["Volume"].iloc[-65:].mean()
+    scores = []
+    for i in range(-64, 0):
+        chg = df["Close"].iloc[i] - df["Close"].iloc[i - 1]
+        vol = df["Volume"].iloc[i]
+        if chg > 0 and vol > avg_vol:
+            scores.append(1)
+        elif chg > 0 and vol > avg_vol * 0.8:
+            scores.append(0)
+        elif chg < 0 and vol > avg_vol:
+            scores.append(-1)
+        elif chg < 0 and vol > avg_vol * 0.8:
+            scores.append(0)
+        else:
+            scores.append(0)
+
+    total = sum(scores)
+    if total >= 25:
+        letter = "A"
+    elif total >= 10:
+        letter = "B"
+    elif total >= -10:
+        letter = "C"
+    elif total >= -25:
+        letter = "D"
+    else:
+        letter = "E"
+    return letter, total
