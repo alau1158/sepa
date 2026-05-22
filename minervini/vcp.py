@@ -31,7 +31,7 @@ def detect_vcp(df):
             rc += 1
     avg_first_two = (ranges[0] + ranges[1]) / 2
     avg_last_two = (ranges[3] + ranges[4]) / 2
-    if avg_last_two < avg_first_two * 0.75:
+    if avg_last_two < avg_first_two * 0.75 and ranges[4] < ranges[3] * 1.10:
         rc += 1
     score += rc * 10
 
@@ -41,7 +41,7 @@ def detect_vcp(df):
             vc += 1
     avg_v_first = (volumes[0] + volumes[1]) / 2
     avg_v_last = (volumes[3] + volumes[4]) / 2
-    if avg_v_last < avg_v_first * 0.80:
+    if avg_v_last < avg_v_first * 0.80 and volumes[4] < volumes[3] * 1.10:
         vc += 1
     score += vc * 5
 
