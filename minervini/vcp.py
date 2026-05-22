@@ -48,11 +48,28 @@ def detect_vcp(df):
     ):
         score += 10
 
-    vol_10 = volumes.rolling(10).mean().iloc[-1]
     vol_50 = volumes.rolling(50).mean().iloc[-1]
-    vol_ratio = vol_10 / vol_50 if vol_50 > 0 else 1
-    vol_score = min(15, max(0, (1 - vol_ratio) * 100))
-    score += vol_score
+    vol_25 = volumes.rolling(25).mean().iloc[-1]
+    vol_10 = volumes.rolling(10).mean().iloc[-1]
+    vol_5 = volumes.rolling(5).mean().iloc[-1]
+    vol_2 = volumes.rolling(2).mean().iloc[-1]
+
+    if vol_25 < vol_50 * 0.90:
+        score += 4
+    if vol_10 < vol_25 * 0.90:
+        score += 4
+    if vol_5 < vol_10 * 0.85:
+        score += 4
+    if vol_2 < vol_5 * 0.80:
+        score += 4
+
+    if (
+        vol_25 < vol_50 * 0.90
+        and vol_10 < vol_25 * 0.90
+        and vol_5 < vol_10 * 0.85
+        and vol_2 < vol_5 * 0.80
+    ):
+        score += 4
 
     if len(df) >= 30:
         recent = df.iloc[-10:]
