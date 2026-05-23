@@ -129,13 +129,18 @@ def compute_exhaustion_score(df):
 
 
 def compute_distribution_score(df):
-    """Distribution / selling-into-weakness detection (0–100). Higher = breaking down."""
+    """Distribution / selling-into-weakness detection (0–100). Higher = breaking down.
+
+    Only recent events (last 3–7 days) contribute, so a stock that had a
+    shakeout 10 days ago but has recovered won't carry old penalty.
+    """
     close = df["Close"]
     high = df["High"]
     low = df["Low"]
     open_ = df["Open"]
     vol = df["Volume"]
     vol_50d = vol.rolling(50).mean()
+    sma_50 = close.rolling(50).mean()
     len_df = len(df)
 
     if len_df < 65:
@@ -144,26 +149,34 @@ def compute_distribution_score(df):
     score = 0
 
     # ── 1. Major Price Break (30 pts) ───────────────────────────────
-    daily_declines = _pct_chg(close.shift(-1), close).shift(1).abs()  # forward-looking
-    daily_declines = _pct_chg(close, close.shift(1)).abs()  # day-over-day decline %
+    daily_declines = _pct_chg(close, close.shift(1))
     trailing_65 = daily_declines.iloc[-65:]
     if len(trailing_65) >= 15:
-        max_decline = trailing_65.max()
-        avg_decline = trailing_65.mean()
-        recent_max = trailing_65.iloc[-15:].max()
-        if recent_max == max_decline and avg_decline > 0 and recent_max > avg_decline * 2:
-            ratio = recent_max / avg_decline
-            if ratio >= 3:
-                score += 30
-            elif ratio >= 2.5:
-                score += 25
-            elif ratio >= 2.0:
-                score += 18
-            elif ratio >= 1.5:
-                score += 10
+        declines_only = trailing_65[trailing_65 < 0].abs()
+        if len(declines_only) >= 5:
+            max_decline = declines_only.max()
+            avg_decline = declines_only.mean()
+            # look at last 5 trading days specifically
+            recent_5_raw = trailing_65.iloc[-5:]
+            recent_5_declines = recent_5_raw[recent_5_raw < 0].abs()
+            if len(recent_5_declines) == 0:
+                recent_5_max = 0
+            else:
+                recent_5_max = recent_5_declines.max()
+            if (recent_5_max == max_decline and avg_decline > 0
+                    and recent_5_max > avg_decline * 2):
+                ratio = recent_5_max / avg_decline
+                if ratio >= 3:
+                    score += 30
+                elif ratio >= 2.5:
+                    score += 25
+                elif ratio >= 2.0:
+                    score += 18
+                elif ratio >= 1.5:
+                    score += 10
 
     # ── 2. High-Volume Reversal (25 pts) ────────────────────────────
-    for i in range(-10, 0):
+    for i in range(-5, 0):
         if (pd.isna(close.iloc[i]) or pd.isna(open_.iloc[i])
                 or pd.isna(close.iloc[i - 1]) or pd.isna(vol.iloc[i])
                 or pd.isna(vol_50d.iloc[i])):
@@ -175,23 +188,21 @@ def compute_distribution_score(df):
             break
 
     # ── 3. MA Violation (25 pts) ────────────────────────────────────
-    sma_50 = close.rolling(50).mean()
-    for i in range(-5, 0):
-        if (pd.isna(close.iloc[i]) or pd.isna(sma_50.iloc[i])
-                or pd.isna(vol.iloc[i]) or pd.isna(vol_50d.iloc[i])):
-            continue
-        below_50 = close.iloc[i] < sma_50.iloc[i]
-        heavy_vol = vol.iloc[i] > vol_50d.iloc[i] * 1.3
-        if below_50 and heavy_vol:
-            score += 25
-            break
-    else:
-        for i in range(-5, 0):
-            if pd.isna(close.iloc[i]) or pd.isna(sma_50.iloc[i]):
-                continue
-            if close.iloc[i] < sma_50.iloc[i]:
-                score += 12
-                break
+    # Only count if still below SMA50 today (not recovered)
+    if not pd.isna(close.iloc[-1]) and not pd.isna(sma_50.iloc[-1]):
+        if close.iloc[-1] < sma_50.iloc[-1]:
+            for i in range(-5, 0):
+                if (pd.isna(close.iloc[i]) or pd.isna(sma_50.iloc[i])
+                        or pd.isna(vol.iloc[i]) or pd.isna(vol_50d.iloc[i])):
+                    continue
+                below_50 = close.iloc[i] < sma_50.iloc[i]
+                heavy_vol = vol.iloc[i] > vol_50d.iloc[i] * 1.3
+                if below_50 and heavy_vol:
+                    score += 25
+                    break
+            else:
+                if close.iloc[-1] < sma_50.iloc[-1]:
+                    score += 12
 
     # ── 4. Full Retracement (20 pts) ────────────────────────────────
     low_50d = low.iloc[-50:].min()
