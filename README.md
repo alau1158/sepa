@@ -62,6 +62,10 @@ Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is 
 | RS Div | Yes preferred | RS line made a new 13d high before price did (bullish divergence) |
 | Corr Div | Strong preferred | Stock held up better than market during SPY corrections ≥5% |
 | Brk Order | 1 or 2 preferred | Breakout timing rank within industry (e.g. `1/3` = first to break out) |
+| Exh | Normal preferred | Exhaustion status: Normal / Late Stage / Exhausted (climax top) |
+| Exh Sc | Lower better | Exhaustion score (0–100), ≥60 = climax top likely |
+| Dist | Normal preferred | Distribution status: Normal / Weakening / Distribution (breaking down) |
+| Dist Sc | Lower better | Distribution score (0–100), ≥60 = institutional selling |
 
 ### Minervini Context for New Columns
 
@@ -109,6 +113,38 @@ For a stock showing strong relative and institutional characteristics, look for:
 - The stock that breaks out earliest gets rank `1`
 - First movers in an industry tend to be the leaders
 
+### Exhaustion Score (Taking Profits Into Strength)
+
+Detects climax-run / blow-off top signals. Higher score = more overextended.
+
+| Component | Max Pts | Method |
+|-----------|---------|--------|
+| Climax Run | 25 | 25–50%+ gain in any rolling 3-week window (last 30 days) |
+| Concentrated Up Days | 20 | ≥70% up days in trailing 15 days |
+| Extreme Price Spread | 20 | Widest daily range (% price) in 65 days, occurring in last 15 |
+| Exhaustion Gap | 15 | Gap up above prior day's high, close held, price >20% above 50 SMA |
+| Churning | 10 | Volume >1.5× avg with <0.5% price move (2+ days in last 10) |
+| P/E Expansion | 10 | Trailing P/E doubled vs ~6 months ago |
+
+- ≥60 = **Exhausted** (climax top likely near)
+- 35–59 = **Late Stage** (extended but not yet climaxing)
+- <35 = **Normal**
+
+### Distribution Score (Selling Into Weakness)
+
+Detects technical breakdown / institutional distribution signals.
+
+| Component | Max Pts | Method |
+|-----------|---------|--------|
+| Major Price Break | 30 | Largest 1-day % decline in 65 days, >2× avg daily move |
+| High-Volume Reversal | 25 | Close below open AND prior close on >1.5× avg volume |
+| MA Violation | 25 | Close below 50 SMA on >1.3× avg volume (within last 5 days) |
+| Full Retracement | 20 | Price within 5% of 50-day low (whipsaw) |
+
+- ≥60 = **Distribution** (institutional selling)
+- 35–59 = **Weakening** (early signs of breakdown)
+- <35 = **Normal**
+
 ### RS Line & Market Divergence
 
 - **RS Line** = stock close / SPY close, measuring relative strength versus the broad market
@@ -147,6 +183,7 @@ minervini/
   indicators.py   — SMAs, ATR, 52w metrics, A/D Rating
   rs_rating.py    — IBD-style RS percentile (40/20/20/20 weighting)
   vcp.py          — VCP detection (5-window swing-based)
+  sell_signals.py — Exhaustion climax + distribution breakdown scores
   screener.py     — Filter + enrichment orchestration
   earnings.py     — Next earnings date from yfinance calendar
   fundamentals.py — Industry RS rank + EPS Rating (cached)

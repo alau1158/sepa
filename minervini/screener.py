@@ -3,6 +3,7 @@ import pandas as pd
 from . import indicators as ind
 from . import rs_rating as rsr
 from . import vcp as vcp_module
+from . import sell_signals as sell
 from . import earnings as earn
 from . import fundamentals as fund
 
@@ -65,6 +66,10 @@ def screen_stocks(data_dict):
                         "RS_Div": rs_div,
                         "Corr_Div": corr_div,
                         "Brk_Order": None,
+                        "Exh_Score": None,
+                        "Exh_Status": None,
+                        "Dist_Score": None,
+                        "Dist_Status": None,
                     }
                 )
         except Exception:
@@ -117,6 +122,16 @@ def screen_stocks(data_dict):
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]
         df_results.at[idx, "EPS_Rating"] = eps_ratings.get(ticker)
+
+    for idx, row in df_results.iterrows():
+        ticker = row["Ticker"]
+        df = data_dict[ticker]
+        ex_score, ex_status = sell.compute_exhaustion_score(df)
+        di_score, di_status = sell.compute_distribution_score(df)
+        df_results.at[idx, "Exh_Score"] = ex_score
+        df_results.at[idx, "Exh_Status"] = ex_status
+        df_results.at[idx, "Dist_Score"] = di_score
+        df_results.at[idx, "Dist_Status"] = di_status
 
     df_results = df_results.sort_values("RS_Rating", ascending=False).reset_index(drop=True)
     return df_results

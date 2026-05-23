@@ -29,6 +29,10 @@ def build_html_table(df, indices):
         rs_div = row.get("RS_Div", "")
         corr_div = row.get("Corr_Div", "")
         brk_order = row.get("Brk_Order", "")
+        exh_score = row.get("Exh_Score", "")
+        exh_status = row.get("Exh_Status", "")
+        dist_score = row.get("Dist_Score", "")
+        dist_status = row.get("Dist_Status", "")
 
         rows_html += f"""<tr>
             <td><a href="https://www.tradingview.com/chart/?symbol={ticker}">{ticker}</a></td>
@@ -46,6 +50,10 @@ def build_html_table(df, indices):
             <td>{rs_div}</td>
             <td>{corr_div}</td>
             <td>{brk_order}</td>
+            <td>{exh_status}</td>
+            <td>{exh_score}</td>
+            <td>{dist_status}</td>
+            <td>{dist_score}</td>
         </tr>"""
 
     html = f"""<html>
@@ -57,6 +65,7 @@ def build_html_table(df, indices):
                 <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>ATR(22)%</th>
                 <th>VCP</th><th>Score</th><th>A/D</th><th>EPS</th><th>Ind Rk</th><th>Next Earnings</th><th>RS</th>
                 <th>RS Trend</th><th>RS Div</th><th>Corr Div</th><th>Brk Order</th>
+                <th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>
             </tr>
             {rows_html}
         </table>
@@ -71,10 +80,11 @@ def build_html_table(df, indices):
 def _build_csv(df):
     out = io.StringIO()
     writer = csv.writer(out)
-    cols = df.columns.tolist()
+    cols = df.columns.tolist() + ["Link"]
     writer.writerow(cols)
     for _, row in df.iterrows():
-        writer.writerow(row.tolist())
+        vals = row.tolist() + [f"https://www.tradingview.com/chart/?symbol={row['Ticker']}"]
+        writer.writerow(vals)
     return out.getvalue()
 
 
