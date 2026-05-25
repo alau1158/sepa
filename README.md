@@ -76,6 +76,8 @@ Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is 
 | Exh Sc | Lower better | Exhaustion score (0–100), ≥60 = climax top likely |
 | Dist | Normal preferred | Distribution status: Normal / Weakening / Distribution (breaking down) |
 | Dist Sc | Lower better | Distribution score (0–100), ≥60 = institutional selling |
+| Viol | Clean preferred | Post-purchase violation status: Clean / Minor / Warning / Multiple |
+| V Sc | Lower better | Violation score (0–100), ≥60 = multiple violations active |
 
 ### Minervini Context for New Columns
 
@@ -162,6 +164,29 @@ Detects technical breakdown / institutional distribution signals.
 - **RS Divergence** detects when the RS line makes a new 13-day high while price does not — a bullish signal that institutional money is quietly accumulating
 - **Market Correction Divergence** looks at SPY 5%+ corrections and checks if the stock made higher lows during those declines, indicating the stock is under accumulation relative to the market
 
+### Post-Purchase Violations (Portfolio Report)
+
+Minervini watches for specific abnormal price/volume activity after entering a trade.
+If multiple violations pile up, the trade is likely failing and should be cut early.
+
+The violations score (0–100) is computed from 8 checks:
+
+| Component | Max Pts | Method |
+|-----------|---------|--------|
+| Breach of 20-day SMA | 15 | Close below 20-day SMA (recent 5 days) |
+| Breach of 50-day SMA + heavy vol | 25 | Close below 50-day SMA on >1.3× avg volume |
+| Three+ Lower Lows | 20 | 3–4 consecutive days of declining lows |
+| Poor Close-to-Range Ratio | 15 | More bad closes (lower half of range) than good closes + more down days |
+| Low Volume Out, High Vol In | 20 | Breakout on below-avg volume, then reversal on heavy volume |
+| Lack of Follow-Through | 15 | Strong up day followed by stalling |
+| Full Retracement of Gains | 20 | Price retraces all gains back to entry after being up ≥10% |
+| Abnormal Volume Reversal | 20 | Attempts to rally, reverses to close lower on heaviest volume of the move |
+
+- ≥60 = **Multiple** (strongly suggests trade will fail)
+- 35–59 = **Warning**
+- 15–34 = **Minor**
+- <15 = **Clean**
+
 ## Watchlist News Summarizer
 
 A standalone script (`news_watchlist.py`) that reads a watchlist file, fetches the past week of news for each ticker via yfinance, summarizes each stock's news into 1–2 paragraphs using Gemini 3.5 Flash, and emails the result.
@@ -193,8 +218,8 @@ python news_watchlist.py --watchlist my.txt   # custom watchlist file
 ## Portfolio Report
 
 Generates a combined HTML report of your open positions (with A/D rating +
-exhaustion/distribution signals from the screener) and closed trades (P&L grouped by
-broker). Reads `journal.csv` from the project root.
+violations + exhaustion/distribution signals from the screener) and closed trades
+(P&L grouped by broker). Reads `journal.csv` from the project root.
 
 ```bash
 python portfolio_report.py              # sends email to REPORT_RECIPIENTS
@@ -237,6 +262,7 @@ minervini/
   rs_rating.py    — IBD-style RS percentile (40/20/20/20 weighting)
   vcp.py          — VCP detection (5-window swing-based)
   sell_signals.py — Exhaustion climax + distribution breakdown scores
+  violations.py   — Post-purchase violation detection (8 Minervini criteria)
   screener.py     — Filter + enrichment orchestration
   earnings.py     — Next earnings date from yfinance calendar
   fundamentals.py — Industry RS rank + EPS Rating (cached)
@@ -244,8 +270,10 @@ minervini/
 screen.py           — SEPA screener CLI
 news_watchlist.py   — Watchlist news summarizer CLI
 portfolio_report.py — Portfolio report with A/D, exhaustion, distribution signals
-.env.template       — Environment variable template
-watchlist.txt       — (gitignored) Your watchlist, one ticker per line
+.env.template           — Environment variable template
+journal.example.csv     — Journal format reference
+watchlist.example.txt   — Watchlist format reference
+watchlist.txt           — (gitignored) Your watchlist, one ticker per line
 ```
 
 ## Requirements
