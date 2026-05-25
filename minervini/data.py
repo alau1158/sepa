@@ -3,6 +3,8 @@ import pickle
 from datetime import datetime
 from io import StringIO
 
+import urllib.request
+
 import pandas as pd
 import requests
 import yfinance as yf
@@ -35,10 +37,46 @@ def get_sp600_tickers():
     return _wiki_tickers("https://en.wikipedia.org/wiki/List_of_S%26P_600_companies")
 
 
+def _ftp_tickers(url, etf_col, test_col):
+    """Fetch common stocks from NASDAQ FTP listings."""
+    resp = urllib.request.urlopen(url, timeout=15)
+    text = resp.read().decode("utf-8")
+    lines = text.strip().split("\n")
+    tickers = []
+    for line in lines[1:]:
+        parts = line.split("|")
+        if len(parts) <= max(etf_col, test_col):
+            continue
+        if parts[etf_col] == "Y":
+            continue
+        if parts[test_col] == "Y":
+            continue
+        name = parts[1].upper()
+        if any(kw in name for kw in ["WARRANT", " RIGHT", " UNIT", "PREFERRED", "DEPOSITARY", "%",
+                                      " FUND", "ETF", "TRUST", "NOTE", "DEBENTURE"]):
+            continue
+        tickers.append(parts[0].replace(".", "-"))
+    return tickers
+
+
+def get_nasdaq_tickers():
+    return _ftp_tickers(
+        "ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqlisted.txt", 6, 3
+    )
+
+
+def get_nyse_tickers():
+    return _ftp_tickers(
+        "ftp://ftp.nasdaqtrader.com/SymbolDirectory/otherlisted.txt", 4, 6
+    )
+
+
 TICKER_SOURCES = {
     "sp500": get_sp500_tickers,
     "sp400": get_sp400_tickers,
     "sp600": get_sp600_tickers,
+    "nasdaq": get_nasdaq_tickers,
+    "nyse": get_nyse_tickers,
 }
 
 
@@ -49,9 +87,10 @@ def get_tickers(index):
     return fn()
 
 
-def download_data(tickers, period="2y", batch_size=100):
+def download_data(tickers, period="2y", batch_size=100, min_price=None):
     all_data = {}
     failed = []
+    filtered = 0
 
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i : i + batch_size]
@@ -70,6 +109,11 @@ def download_data(tickers, period="2y", batch_size=100):
                     try:
                         td = data[ticker]
                         if isinstance(td, pd.DataFrame) and not td.empty:
+                            if min_price is not None:
+                                last_close = td["Close"].iloc[-1]
+                                if pd.isna(last_close) or last_close < min_price:
+                                    filtered += 1
+                                    continue
                             all_data[ticker] = td
                         else:
                             failed.append(ticker)
@@ -77,12 +121,17 @@ def download_data(tickers, period="2y", batch_size=100):
                         failed.append(ticker)
             else:
                 if batch and not data.empty:
-                    all_data[batch[0]] = data
+                    if min_price is None or data["Close"].iloc[-1] >= min_price:
+                        all_data[batch[0]] = data
+                    else:
+                        filtered += 1
                 else:
                     failed.extend(batch)
         except Exception:
             failed.extend(batch)
 
+    if filtered:
+        print(f"  Filtered {filtered} stocks below ${min_price}")
     return all_data, failed
 
 

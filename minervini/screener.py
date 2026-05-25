@@ -93,9 +93,9 @@ def screen_stocks(data_dict):
         ticker = row["Ticker"]
         df_results.at[idx, "Next_Earnings"] = earnings_cache.get(ticker, "N/A")
 
-    industries = fund.get_industries(all_tickers)
+    industries = fund.get_industries(passing_tickers)
     ind_ranks = fund.compute_industry_ranks(
-        all_tickers, passing_tickers, rs_ratings, industries
+        passing_tickers, rs_ratings, industries
     )
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]

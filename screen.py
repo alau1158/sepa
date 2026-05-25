@@ -27,19 +27,28 @@ def main():
     parser.add_argument("-sp500", action="store_true", help="Screen S&P 500")
     parser.add_argument("-sp400", action="store_true", help="Screen S&P 400")
     parser.add_argument("-sp600", action="store_true", help="Screen S&P 600")
-    parser.add_argument("-all", action="store_true", help="Screen all indices")
+    parser.add_argument("-nasdaq", action="store_true", help="Screen NASDAQ common stocks")
+    parser.add_argument("-nyse", action="store_true", help="Screen NYSE common stocks")
+    parser.add_argument("-all", action="store_true", help="Screen all S&P indices")
+    parser.add_argument("--all-us", action="store_true", help="Screen all US stocks (S&P + NASDAQ + NYSE)")
     parser.add_argument("--no-email", action="store_true", help="Print results to console only")
     parser.add_argument("--output", type=str, help="Save results to CSV file")
     parser.add_argument("--refresh", action="store_true", help="Force re-download data")
     args = parser.parse_args()
 
     indices = []
+    if args.all_us:
+        indices = ["sp500", "sp400", "sp600", "nasdaq", "nyse"]
     if args.all or args.sp500:
         indices.append("sp500")
     if args.all or args.sp400:
         indices.append("sp400")
     if args.all or args.sp600:
         indices.append("sp600")
+    if args.nasdaq:
+        indices.append("nasdaq")
+    if args.nyse:
+        indices.append("nyse")
 
     if not indices:
         parser.print_help()
@@ -67,8 +76,9 @@ def main():
                 print(f"  No tickers found for {index}, skipping.")
                 continue
 
+            min_price = 15 if index in ("nasdaq", "nyse") else None
             print(f"  Found {len(tickers)} stocks. Downloading data (this may take a while)...")
-            data_dict, failed = download_data(tickers)
+            data_dict, failed = download_data(tickers, min_price=min_price)
             print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)")
             save_cache(index, tickers, data_dict, failed)
 
@@ -88,6 +98,9 @@ def main():
         return
 
     combined = pd.concat(all_results, ignore_index=True)
+    combined = combined.drop_duplicates(subset="Ticker").reset_index(drop=True)
+    if len(all_results) > 1:
+        print(f"\n  Combined: {len(combined)} unique stocks")
 
     if args.output:
         combined.to_csv(args.output, index=False)

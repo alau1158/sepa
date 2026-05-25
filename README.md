@@ -1,6 +1,6 @@
 # SEPA Stage 2 Stock Screener
 
-A stock screener implementing Mark Minervini's **SEPA** (Specific Entry Point Analysis) methodology to identify stocks in a **Stage 2 uptrend**. Screens the S&P 500, S&P 400, and S&P 600 indices.
+A stock screener implementing Mark Minervini's **SEPA** (Specific Entry Point Analysis) methodology to identify stocks in a **Stage 2 uptrend**. Screens the S&P 500, S&P 400, S&P 600, NASDAQ, and NYSE. Also includes a separate watchlist news summarizer that fetches recent news and summarizes it via Gemini AI.
 
 ## The 8 Trend Template Criteria
 
@@ -24,12 +24,17 @@ All 8 must pass simultaneously for a stock to qualify:
 python screen.py -sp500
 python screen.py -sp400
 python screen.py -sp600
+python screen.py -nasdaq
+python screen.py -nyse
 
 # Multiple indices
-python screen.py -sp500 -sp600
+python screen.py -sp500 -sp600 -nasdaq
 
-# All three
+# All S&P indices
 python screen.py -all
+
+# All US stocks (S&P + NASDAQ + NYSE)
+python screen.py --all-us
 
 # Console only (no email)
 python screen.py -sp500 --no-email
@@ -39,6 +44,11 @@ python screen.py -sp500 --output results.csv
 
 # Force re-download (ignore cache)
 python screen.py -sp500 --refresh
+
+# ── Watchlist News Summarizer ──────────────────────
+python news_watchlist.py                            # full run (news → Gemini → email)
+python news_watchlist.py --no-email                 # print summaries to console
+python news_watchlist.py --watchlist my_list.txt    # use a different watchlist file
 ```
 
 ## Output Columns
@@ -152,19 +162,51 @@ Detects technical breakdown / institutional distribution signals.
 - **RS Divergence** detects when the RS line makes a new 13-day high while price does not — a bullish signal that institutional money is quietly accumulating
 - **Market Correction Divergence** looks at SPY 5%+ corrections and checks if the stock made higher lows during those declines, indicating the stock is under accumulation relative to the market
 
+## Watchlist News Summarizer
+
+A standalone script (`news_watchlist.py`) that reads a watchlist file, fetches the past week of news for each ticker via yfinance, summarizes each stock's news into 1–2 paragraphs using Gemini 3.5 Flash, and emails the result.
+
+### Watchlist File Format
+
+One ticker per line, `#` for comments:
+
+```
+# My watchlist
+AAPL
+NVDA
+AMD
+DELL
+```
+
+Default path: `watchlist.txt` (override with `--watchlist`).
+
+### Per-Ticker Summaries
+
+Each stock gets its own Gemini AI summary paragraph in the email, followed by the raw article links. This keeps the signal per-stock rather than mixing everything into one blob.
+
+```bash
+python news_watchlist.py                      # full run
+python news_watchlist.py --no-email           # console only
+python news_watchlist.py --watchlist my.txt   # custom watchlist file
+```
+
 ## Email Setup
 
-Configure `.env` in the project root:
+Copy `.env.template` to `.env` and fill in your credentials:
 
 ```env
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 RECIPIENTS=email1@example.com,email2@example.com
+REPORT_RECIPIENTS=you@example.com
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 - Uses Gmail SMTP (`smtp.gmail.com:587`)
 - App passwords recommended (enable 2FA → create app-specific password)
 - Multiple recipients comma-separated (`#` comments supported)
+- `RECIPIENTS` receives screener results; `REPORT_RECIPIENTS` receives news summaries
+- `GEMINI_API_KEY` is required only for the watchlist news summarizer (get one at [aistudio.google.com](https://aistudio.google.com/))
 
 ## Caching
 
@@ -188,7 +230,10 @@ minervini/
   earnings.py     — Next earnings date from yfinance calendar
   fundamentals.py — Industry RS rank + EPS Rating (cached)
   emailer.py      — HTML table with TradingView links, Gmail SMTP
-screen.py         — CLI entry point with argparse
+screen.py           — SEPA screener CLI
+news_watchlist.py   — Watchlist news summarizer CLI
+watchlist.txt       — Default watchlist (one ticker per line)
+.env.template       — Environment variable template
 ```
 
 ## Requirements
@@ -199,6 +244,7 @@ screen.py         — CLI entry point with argparse
 - lxml
 - tqdm
 - python-dotenv
+- google-genai (watchlist news only)
 
 Install: `pip install -r requirements.txt`
 

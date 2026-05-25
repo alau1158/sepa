@@ -78,13 +78,12 @@ def _get_industry(ticker):
         return None
 
 
-def compute_industry_ranks(all_tickers, passing_tickers, rs_ratings, industries):
+def compute_industry_ranks(passing_tickers, rs_ratings, industries):
     """Rank industries by the max RS of PASSING tickers (Minervini bottom-up).
 
     Only industries with ≥1 passing ticker are ranked.
     Returns dict[ticker] -> (rank, total_industries).
     """
-    passing_set = set(passing_tickers)
     ind_max_rs = {}
     for t in passing_tickers:
         ind = industries.get(t)
@@ -102,7 +101,7 @@ def compute_industry_ranks(all_tickers, passing_tickers, rs_ratings, industries)
     total = len(sorted_inds)
 
     ticker_ranks = {}
-    for t in all_tickers:
+    for t in passing_tickers:
         ind = industries.get(t)
         if ind and ind in rank_map:
             ticker_ranks[t] = (rank_map[ind], total)
