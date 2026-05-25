@@ -178,7 +178,7 @@ AMD
 DELL
 ```
 
-Default path: `watchlist.txt` (override with `--watchlist`).
+Default path: `watchlist.txt` (override with `--watchlist`). This file is gitignored — create your own, one ticker per line.
 
 ### Per-Ticker Summaries
 
@@ -232,8 +232,9 @@ minervini/
   emailer.py      — HTML table with TradingView links, Gmail SMTP
 screen.py           — SEPA screener CLI
 news_watchlist.py   — Watchlist news summarizer CLI
-watchlist.txt       — Default watchlist (one ticker per line)
+portfolio_report.py — Portfolio report with A/D, exhaustion, distribution signals
 .env.template       — Environment variable template
+watchlist.txt       — (gitignored) Your watchlist, one ticker per line
 ```
 
 ## Requirements
