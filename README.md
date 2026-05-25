@@ -190,6 +190,17 @@ python news_watchlist.py --no-email           # console only
 python news_watchlist.py --watchlist my.txt   # custom watchlist file
 ```
 
+## Portfolio Report
+
+Generates a combined HTML report of your open positions (with A/D rating +
+exhaustion/distribution signals from the screener) and closed trades (P&L grouped by
+broker). Reads `journal.csv` from the project root.
+
+```bash
+python portfolio_report.py              # sends email to REPORT_RECIPIENTS
+python portfolio_report.py --no-email   # print to console only
+```
+
 ## Email Setup
 
 Copy `.env.template` to `.env` and fill in your credentials:
