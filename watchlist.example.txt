@@ -1,0 +1,7 @@
+# Watchlist — one ticker per line, # for comments
+# These are the stocks you want news summaries for via news_watchlist.py
+AAPL
+NVDA
+AMD
+MSFT
+GOOG

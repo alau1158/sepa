@@ -1,0 +1,12 @@
+broker,action,ticket,quantity,date,price
+# broker: e=Etrade, r=Robinhhod, f=Fidelity
+# action: buy or sell
+# ticket: stock symbol
+# quantity: number of shares
+# date: YYYYMMDD
+# price: price per share
+# ── Example buy (open position) ──
+e,buy,AAPL,20,20260501,250.00
+# ── Example buy + sell (closed trade) ──
+e,buy,NVDA,10,20260401,200.00
+e,sell,NVDA,10,20260415,220.00

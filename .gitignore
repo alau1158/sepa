@@ -2,5 +2,5 @@ __pycache__/
 *.pyc
 *.pkl
 .env
-journal*
+/journal.csv
 watchlist.txt
