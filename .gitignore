@@ -3,4 +3,5 @@ __pycache__/
 *.pkl
 .env
 /journal.csv
+.journal.csv.swp
 watchlist.txt
