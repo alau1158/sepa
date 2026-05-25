@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(SWING_DIR))
 from portfolio_tracker import load_transactions, fifo_match, get_portfolio_summary
 from minervini.sell_signals import compute_exhaustion_score, compute_distribution_score
 from minervini.indicators import compute_sma, compute_ad_rating
+from minervini.violations import compute_violations
 
 
 JOURNAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "journal.csv")
@@ -87,6 +88,8 @@ def analyze_open_positions(tickers, entry_prices, shares, brokers, purchase_date
 
         ad_letter, ad_score = compute_ad_rating(df)
 
+        viol_count, viol_score, viol_status, viol_reasons = compute_violations(df, entry)
+
         exh_score, exh_status = compute_exhaustion_score(df)
         dist_score, dist_status = compute_distribution_score(df)
 
@@ -102,6 +105,9 @@ def analyze_open_positions(tickers, entry_prices, shares, brokers, purchase_date
             "vs_sma50": vs_sma50,
             "ad_letter": ad_letter,
             "ad_score": ad_score,
+            "viol_status": viol_status,
+            "viol_score": viol_score,
+            "viol_reasons": viol_reasons,
             "exh_status": exh_status,
             "exh_score": exh_score,
             "dist_status": dist_status,
@@ -135,6 +141,7 @@ def build_html_report(open_results, closed_trades):
         days = f"{r['days_held']}d" if r["days_held"] is not None else "N/A"
         vs50 = f"{r['vs_sma50']:+.1f}%" if r["vs_sma50"] is not None else "N/A"
         ad = f"{r['ad_letter']} ({r['ad_score']})"
+        viol = f"{r['viol_status']} ({r['viol_score']})"
 
         open_rows += f"""<tr style="background-color:{color};">
 <td>{r["broker"]}</td>
@@ -146,6 +153,8 @@ def build_html_report(open_results, closed_trades):
 <td>{days}</td>
 <td>{vs50}</td>
 <td>{ad}</td>
+<td style="font-weight:bold;">{r["viol_status"]}</td>
+<td>{r["viol_score"]}</td>
 <td style="font-weight:bold;">{r["exh_status"]}</td>
 <td>{r["exh_score"]}</td>
 <td style="font-weight:bold;">{r["dist_status"]}</td>
@@ -215,7 +224,7 @@ td {{ padding:8px; border:1px solid #ddd; }}
 <table>
 <tr>
 <th>Broker</th><th>Ticker</th><th>Shares</th><th>Price</th><th>Entry</th><th>P&amp;L</th>
-<th>Held</th><th>vs 50 SMA</th><th>A/D</th><th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>
+<th>Held</th><th>vs 50 SMA</th><th>A/D</th><th>Viol</th><th>V Sc</th><th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>
 </tr>
 {open_rows}
 </table>
@@ -293,8 +302,10 @@ def main():
     open_results = analyze_open_positions(tickers, entry_prices, shares, brokers, purchase_dates)
 
     for r in open_results:
+        viol_extra = f" [{r['viol_reasons']}]" if r["viol_reasons"] else ""
         print(f"  {r['broker']}-{r['ticker']}: ${r['current_price']:.2f} | "
               f"P&L: {r['pnl_pct']:+.2f}% | A/D: {r['ad_letter']} ({r['ad_score']}) | "
+              f"Viol: {r['viol_status']} ({r['viol_score']}){viol_extra} | "
               f"Exh: {r['exh_status']} ({r['exh_score']}) | "
               f"Dist: {r['dist_status']} ({r['dist_score']})")
 
