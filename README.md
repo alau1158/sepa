@@ -226,6 +226,37 @@ python portfolio_report.py              # sends email to REPORT_RECIPIENTS
 python portfolio_report.py --no-email   # print to console only
 ```
 
+## Momentum Acceleration Scanner
+
+Experimental scanner (`momentum_accel.py`) that detects stocks in a parabolic
+acceleration phase — rapid price expansion on heavy volume, similar to what MU
+showed in early May 2026. Complements VCP (quiet setups) by finding explosive moves.
+
+Scoring (0–100): Price Acceleration (25) + Power Days (20) + SMA Expansion (20)
++ Volume Ratio (15) + RS Slope (20).
+
+```bash
+python momentum_accel.py -nasdaq --top 20                # top 20 NASDAQ
+python momentum_accel.py -sp500 -sp400 --top 30           # top 30 S&P
+python momentum_accel.py --all-us --min-score 60          # all US, ≥60 only
+python momentum_accel.py --watchlist watchlist.txt        # watchlist only
+python momentum_accel.py -nasdaq --no-email               # console only
+```
+
+## Peer Comparison Scanner
+
+Find stocks in the same industry as a given ticker and compare their momentum,
+exhaustion, and distribution scores (`peerscan.py`). Uses cached data from all
+available indices.
+
+```bash
+python peerscan.py PANW                           # top 30 peers, email
+python peerscan.py PANW --top 10                   # top 10 only
+python peerscan.py PANW --min-score 60             # only accelerating+
+python peerscan.py PANW --no-email                 # console only
+python peerscan.py -i                              # interactive mode
+```
+
 ## Email Setup
 
 Copy `.env.template` to `.env` and fill in your credentials:
@@ -270,6 +301,8 @@ minervini/
 screen.py           — SEPA screener CLI
 news_watchlist.py   — Watchlist news summarizer CLI
 portfolio_report.py — Portfolio report with A/D, exhaustion, distribution signals
+momentum_accel.py   — Momentum acceleration scanner (experimental)
+peerscan.py         — Peer comparison scanner by industry
 .env.template           — Environment variable template
 journal.example.csv     — Journal format reference
 watchlist.example.txt   — Watchlist format reference
