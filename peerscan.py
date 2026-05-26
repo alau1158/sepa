@@ -138,9 +138,9 @@ def main():
     print("  Fetching industry data for cached stocks...")
     ind_map = get_industries(universe_tickers)
 
-    peers = {t: universe[t] for t, ind in ind_map.items() if ind == industry}
+    peers = {t: universe[t] for t, ind in ind_map.items() if ind == industry and t in universe}
     if not peers:
-        peers = {t: universe[t] for t, ind in ind_map.items() if ind == sector}
+        peers = {t: universe[t] for t, ind in ind_map.items() if ind == sector and t in universe}
         label = "Sector"
     else:
         label = "Industry"
