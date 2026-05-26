@@ -332,7 +332,7 @@ def main():
     print(df.to_string(index=False))
 
     if not args.no_email:
-        raw_rcpt = os.getenv("REPORT_RECIPIENTS", "")
+        raw_rcpt = os.getenv("RECIPIENTS", "")
         smtp_user = os.getenv("SMTP_USER")
         smtp_pass = os.getenv("SMTP_PASSWORD")
         if smtp_user and smtp_pass and raw_rcpt:
