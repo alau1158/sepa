@@ -193,6 +193,10 @@ def send_email(results, indices, smtp_config, recipients, top_n=30):
 </tr>"""
 
     html = f"""<html><body style="font-family:Arial,sans-serif;">
+<div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;margin-bottom:15px;border-radius:4px;">
+<strong>⚠️ Disclaimer:</strong> This scan only flags stocks with recent price spikes.
+It does not check <em>why</em> they are moving — do your own research before trading.
+</div>
 <h2>Momentum Acceleration Scan</h2>
 <p>{date_str} | Universe: {index_str} | Passing: {len(results)} stocks</p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
