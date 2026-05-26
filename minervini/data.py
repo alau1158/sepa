@@ -44,6 +44,8 @@ def _ftp_tickers(url, etf_col, test_col):
     lines = text.strip().split("\n")
     tickers = []
     for line in lines[1:]:
+        if line.strip().upper().startswith("FILE"):
+            continue
         parts = line.split("|")
         if len(parts) <= max(etf_col, test_col):
             continue
