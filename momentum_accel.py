@@ -326,7 +326,7 @@ def main():
     if args.watchlist:
         pass  # handled separately
     elif args.all_us:
-        indices = ["sp500", "sp400", "sp600", "nasdaq", "nyse"]
+        indices = ["nasdaq", "nyse"]
     else:
         if args.all or args.sp500: indices.append("sp500")
         if args.all or args.sp400: indices.append("sp400")

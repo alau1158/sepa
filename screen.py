@@ -30,15 +30,12 @@ def main():
     parser.add_argument("-nasdaq", action="store_true", help="Screen NASDAQ common stocks")
     parser.add_argument("-nyse", action="store_true", help="Screen NYSE common stocks")
     parser.add_argument("-all", action="store_true", help="Screen all S&P indices")
-    parser.add_argument("--all-us", action="store_true", help="Screen all US stocks (S&P + NASDAQ + NYSE)")
-    parser.add_argument("--no-email", action="store_true", help="Print results to console only")
-    parser.add_argument("--output", type=str, help="Save results to CSV file")
-    parser.add_argument("--refresh", action="store_true", help="Force re-download data")
+    parser.add_argument("--all-us", action="store_true", help="Screen NASDAQ + NYSE (incl. S&P components)")
     args = parser.parse_args()
 
     indices = []
     if args.all_us:
-        indices = ["sp500", "sp400", "sp600", "nasdaq", "nyse"]
+        indices = ["nasdaq", "nyse"]
     if args.all or args.sp500:
         indices.append("sp500")
     if args.all or args.sp400:
