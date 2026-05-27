@@ -31,7 +31,7 @@ def compute_score(df):
 
     # ── 1. Price Acceleration (25 pts) ──────────────────────────────
     ret_5d = (close.iloc[-1] / close.iloc[-6] - 1) * 100 if len(close) >= 6 else 0
-    daily_chg = close.pct_change() * 100
+    daily_chg = close.pct_change(fill_method=None) * 100
     avg_move_10d = daily_chg.iloc[-11:-1].abs().mean() if len(daily_chg) >= 11 else 1
     comp1 = 0
     if ret_5d > 10:
@@ -203,9 +203,13 @@ def get_results(data_dict, min_score=0):
 
 
 def send_email(results, indices, smtp_config, recipients, top_n=30):
+    import csv
+    import io
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email import encoders
 
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     index_str = ", ".join(i.upper() for i in indices)
@@ -248,11 +252,33 @@ It does not check <em>why</em> they are moving — do your own research before t
 <p style="color:#888;font-size:12px;">Experimental — not financial advice. Stage: Fresh=1d, Running=2d, Extended=3+ days in this run.</p>
 </body></html>"""
 
-    msg = MIMEMultipart("alternative")
+    # ── Build CSV attachment ──
+    csv_out = io.StringIO()
+    writer = csv.writer(csv_out)
+    cols = ["Ticker", "Price", "Score", "Status", "Stage", "Days",
+            "5d%", "10d%", "20d%", "Accel", "Power", "SMA_Exp",
+            "Vol_Ratio", "RS_Slope"]
+    writer.writerow(cols)
+    for r in results[:top_n]:
+        writer.writerow([r.get(c, "") for c in cols])
+    csv_data = csv_out.getvalue()
+
+    # ── Build message ──
+    msg = MIMEMultipart("mixed")
     msg["Subject"] = f"Momentum Acceleration Scan - {date_str}"
     msg["From"] = smtp_config["user"]
     msg["To"] = ", ".join(recipients)
-    msg.attach(MIMEText(html, "html"))
+
+    body = MIMEMultipart("alternative")
+    body.attach(MIMEText(html, "html"))
+    msg.attach(body)
+
+    csv_part = MIMEBase("text", "csv")
+    csv_part.set_payload(csv_data)
+    encoders.encode_base64(csv_part)
+    csv_part.add_header("Content-Disposition", "attachment",
+                        filename=f"momentum_scan_{date_str[:10]}.csv")
+    msg.attach(csv_part)
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
