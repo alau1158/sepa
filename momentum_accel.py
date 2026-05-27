@@ -220,7 +220,7 @@ def send_email(results, indices, smtp_config, recipients, top_n=30):
         if r.get("Stage") == "Fresh": stage_style = ' style="background:#d4edda;font-weight:bold;"'
         elif r.get("Stage") == "Running": stage_style = ' style="background:#fff3cd;font-weight:bold;"'
         rows += f"""<tr>
-<td>{r['Ticker']}</td>
+<td><a href="https://www.tradingview.com/chart/?symbol={r['Ticker']}">{r['Ticker']}</a></td>
 <td>${r['Price']}</td>
 <td style="font-weight:bold;">{r['Score']}</td>
 <td>{r['Status']}</td>
