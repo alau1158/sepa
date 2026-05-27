@@ -31,6 +31,9 @@ def main():
     parser.add_argument("-nyse", action="store_true", help="Screen NYSE common stocks")
     parser.add_argument("-all", action="store_true", help="Screen all S&P indices")
     parser.add_argument("--all-us", action="store_true", help="Screen NASDAQ + NYSE (incl. S&P components)")
+    parser.add_argument("--no-email", action="store_true", help="Print results to console only")
+    parser.add_argument("--output", type=str, help="Save results to CSV file")
+    parser.add_argument("--refresh", action="store_true", help="Force re-download data")
     args = parser.parse_args()
 
     indices = []
