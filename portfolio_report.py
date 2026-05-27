@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import smtplib
-import sys
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -11,9 +10,6 @@ import yfinance as yf
 from dotenv import load_dotenv
 
 load_dotenv()
-
-SWING_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "swingtrading")
-sys.path.insert(0, os.path.abspath(SWING_DIR))
 
 from portfolio_tracker import load_transactions, fifo_match, get_portfolio_summary
 from minervini.sell_signals import compute_exhaustion_score, compute_distribution_score
