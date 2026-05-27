@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import smtplib
+import socket
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -20,8 +21,51 @@ from minervini.violations import compute_violations
 JOURNAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "journal.csv")
 
 
-def load_portfolio():
-    transactions = load_transactions(JOURNAL_PATH)
+def load_transactions_from_sheet():
+    import gspread
+
+    creds_file = os.getenv("GOOGLE_CREDENTIALS")
+    sheet_id = os.getenv("SHEET_ID")
+    if not creds_file or not sheet_id:
+        raise ValueError("GOOGLE_CREDENTIALS and SHEET_ID must be set in .env")
+
+    _gai = socket.getaddrinfo
+    try:
+        socket.getaddrinfo = lambda *a, **kw: [
+            r for r in _gai(*a, **kw) if r[0] == socket.AF_INET
+        ]
+        gc = gspread.service_account(filename=creds_file)
+        sh = gc.open_by_key(sheet_id)
+        ws = sh.sheet1
+        records = ws.get_all_values()
+    finally:
+        socket.getaddrinfo = _gai
+
+    df = pd.DataFrame(records[1:], columns=records[0])
+    df.columns = df.columns.str.strip().str.lower()
+    df["action"] = df["action"].str.strip().str.lower()
+    df["ticket"] = df["ticket"].str.strip().str.upper()
+    df["broker"] = df["broker"].str.strip().str.lower()
+    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
+    df["price"] = pd.to_numeric(df["price"], errors="coerce")
+    df["date"] = pd.to_datetime(
+        df["date"].astype(str).str.strip(), format="%Y%m%d", errors="coerce"
+    )
+    df = df.dropna(subset=["date", "quantity", "price"])
+    df = df.sort_values(["date", "action"]).reset_index(drop=True)
+    return df
+
+
+def load_portfolio(from_csv=False):
+    if from_csv:
+        transactions = load_transactions(JOURNAL_PATH)
+    else:
+        try:
+            transactions = load_transactions_from_sheet()
+        except Exception as e:
+            print(f"Google Sheets unavailable ({e}), falling back to CSV...")
+            transactions = load_transactions(JOURNAL_PATH)
+
     open_positions, closed_trades = fifo_match(transactions)
     summary = get_portfolio_summary(open_positions)
 
@@ -282,10 +326,11 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Portfolio report with screener signals")
     parser.add_argument("--no-email", action="store_true", help="Print to console only")
+    parser.add_argument("--from-csv", action="store_true", help="Read journal.csv instead of Google Sheets")
     args = parser.parse_args()
 
     print("Loading portfolio...")
-    tickers, entry_prices, purchase_dates, shares, brokers, closed_trades = load_portfolio()
+    tickers, entry_prices, purchase_dates, shares, brokers, closed_trades = load_portfolio(from_csv=args.from_csv)
 
     print(f"  Open positions: {len(tickers)} tickers")
     print(f"  Closed trades: {len(closed_trades)}")

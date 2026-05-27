@@ -219,12 +219,43 @@ python news_watchlist.py --watchlist my.txt   # custom watchlist file
 
 Generates a combined HTML report of your open positions (with A/D rating +
 violations + exhaustion/distribution signals from the screener) and closed trades
-(P&L grouped by broker). Reads `journal.csv` from the project root.
+(P&L grouped by broker).
+
+Reads from a **Google Sheet** by default (no more hand-editing CSV). Falls back to
+`journal.csv` if the sheet is unreachable.
 
 ```bash
-python portfolio_report.py              # sends email to REPORT_RECIPIENTS
-python portfolio_report.py --no-email   # print to console only
+python portfolio_report.py                  # reads from Google Sheets
+python portfolio_report.py --from-csv       # reads journal.csv instead
+python portfolio_report.py --no-email       # print to console only
 ```
+
+### Google Sheets Setup (once)
+
+1. Go to https://console.cloud.google.com → create a project → enable **Google Sheets API**
+2. **Credentials** → **Create Credentials** → **Service Account**
+3. Name it (e.g. `journal-reader`), skip optional fields, click **Done**
+4. Click the service account → **Keys** tab → **Add Key** → **Create New Key** → **JSON**
+5. A `.json` file downloads — save it to the project root as `service-account-key.json`
+6. Open your Google Sheet, click **Share**, paste the service account email from the JSON (looks like `journal-reader@your-project.iam.gserviceaccount.com`), grant **Editor** access
+7. Set these in `.env`:
+
+```env
+GOOGLE_CREDENTIALS=service-account-key.json
+SHEET_ID=your_sheet_id_here    # from the URL: /d/THIS_IS_THE_ID/edit
+```
+
+**Sheet format** — first row must be the headers, data rows follow:
+
+| broker | action | ticket | quantity | date | price |
+|--------|--------|--------|----------|------|-------|
+| e      | buy    | AAPL   | 20       | 20260318 | 252.62 |
+| e      | sell   | AAPL   | 20       | 20260401 | 255.43 |
+
+- **broker**: `e` (Etrade), `f` (Fidelity), `r` (Robinhood)
+- **action**: `buy` or `sell`
+- **date**: `YYYYMMDD` format (e.g. `20260527`)
+- **ticket/quantity/price**: plain numbers
 
 ## Momentum Acceleration Scanner
 
@@ -267,6 +298,8 @@ SMTP_PASSWORD=your_app_password
 RECIPIENTS=email1@example.com,email2@example.com
 REPORT_RECIPIENTS=you@example.com
 GEMINI_API_KEY=your_gemini_api_key
+GOOGLE_CREDENTIALS=your-service-account-key.json
+SHEET_ID=your_sheet_id_here
 ```
 
 - Uses Gmail SMTP (`smtp.gmail.com:587`)
@@ -274,6 +307,7 @@ GEMINI_API_KEY=your_gemini_api_key
 - Multiple recipients comma-separated (`#` comments supported)
 - `RECIPIENTS` receives screener results; `REPORT_RECIPIENTS` receives news summaries
 - `GEMINI_API_KEY` is required only for the watchlist news summarizer (get one at [aistudio.google.com](https://aistudio.google.com/))
+- `GOOGLE_CREDENTIALS` / `SHEET_ID` — required for portfolio report Google Sheets integration
 
 ## Caching
 
