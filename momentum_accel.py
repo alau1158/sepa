@@ -130,6 +130,36 @@ def compute_score(df):
     return score, status, components
 
 
+def get_run_stage(df):
+    """Count consecutive days in current acceleration run.
+    Fresh = 1d, Running = 2d, Extended = 3+ days.
+    """
+    close = df["Close"]
+    high = df["High"]
+    vol = df["Volume"]
+    vol_50d = vol.rolling(50).mean()
+    count = 0
+    for i in range(-1, -21, -1):
+        if (pd.isna(close.iloc[i]) or pd.isna(high.iloc[i])
+                or pd.isna(vol.iloc[i]) or pd.isna(vol_50d.iloc[i])):
+            break
+        close_above_prior = close.iloc[i] > max(close.iloc[i - 1], high.iloc[i - 1])
+        heavy_vol = vol.iloc[i] > vol_50d.iloc[i] * 1.2
+        if close_above_prior and heavy_vol:
+            count += 1
+        else:
+            break
+    if count == 0:
+        stage = "Quiet"
+    elif count == 1:
+        stage = "Fresh"
+    elif count == 2:
+        stage = "Running"
+    else:
+        stage = "Extended"
+    return count, stage
+
+
 def get_results(data_dict, min_score=0):
     results = []
     for ticker, df in data_dict.items():
@@ -144,6 +174,9 @@ def get_results(data_dict, min_score=0):
         if score < min_score:
             continue
 
+        run_days, stage = get_run_stage(df)
+
+        close = df["Close"].iloc[-1]
         ret_5d = (close / df["Close"].iloc[-6] - 1) * 100 if len(df) >= 6 else 0
         ret_10d = (close / df["Close"].iloc[-11] - 1) * 100 if len(df) >= 11 else 0
         ret_20d = (close / df["Close"].iloc[-21] - 1) * 100 if len(df) >= 21 else 0
@@ -153,6 +186,8 @@ def get_results(data_dict, min_score=0):
             "Price": round(close, 2),
             "Score": score,
             "Status": status,
+            "Stage": stage,
+            "Days": run_days,
             "5d%": round(ret_5d, 1),
             "10d%": round(ret_10d, 1),
             "20d%": round(ret_20d, 1),
@@ -177,11 +212,16 @@ def send_email(results, indices, smtp_config, recipients, top_n=30):
 
     rows = ""
     for r in results[:top_n]:
+        stage_style = ""
+        if r.get("Stage") == "Fresh": stage_style = ' style="background:#d4edda;font-weight:bold;"'
+        elif r.get("Stage") == "Running": stage_style = ' style="background:#fff3cd;font-weight:bold;"'
         rows += f"""<tr>
 <td>{r['Ticker']}</td>
 <td>${r['Price']}</td>
 <td style="font-weight:bold;">{r['Score']}</td>
 <td>{r['Status']}</td>
+<td{stage_style}>{r.get('Stage', '')}</td>
+<td>{r.get('Days', '')}</td>
 <td>{r['5d%']:+.1f}%</td>
 <td>{r['10d%']:+.1f}%</td>
 <td>{r['20d%']:+.1f}%</td>
@@ -201,11 +241,11 @@ It does not check <em>why</em> they are moving — do your own research before t
 <p>{date_str} | Universe: {index_str} | Passing: {len(results)} stocks</p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
 <tr style="background:#2c3e50;color:white;">
-<th>Ticker</th><th>Price</th><th>Score</th><th>Status</th><th>5d%</th><th>10d%</th><th>20d%</th><th>Accel</th><th>Power</th><th>SMA Exp</th><th>Vol Ratio</th><th>RS Slope</th>
+<th>Ticker</th><th>Price</th><th>Score</th><th>Status</th><th>Stage</th><th>Days</th><th>5d%</th><th>10d%</th><th>20d%</th><th>Accel</th><th>Power</th><th>SMA Exp</th><th>Vol Ratio</th><th>RS Slope</th>
 </tr>
 {rows}
 </table>
-<p style="color:#888;font-size:12px;">Experimental — not financial advice.</p>
+<p style="color:#888;font-size:12px;">Experimental — not financial advice. Stage: Fresh=1d, Running=2d, Extended=3+ days in this run.</p>
 </body></html>"""
 
     msg = MIMEMultipart("alternative")
