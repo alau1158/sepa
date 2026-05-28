@@ -46,8 +46,8 @@ def load_transactions_from_sheet():
     df["action"] = df["action"].str.strip().str.lower()
     df["ticket"] = df["ticket"].str.strip().str.upper()
     df["broker"] = df["broker"].str.strip().str.lower()
-    df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
-    df["price"] = pd.to_numeric(df["price"], errors="coerce")
+    df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(r'[\$,]', '', regex=True), errors="coerce")
+    df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(r'[\$,]', '', regex=True), errors="coerce")
     df["date"] = pd.to_datetime(
         df["date"].astype(str).str.strip(), format="%Y%m%d", errors="coerce"
     )

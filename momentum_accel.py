@@ -202,7 +202,7 @@ def get_results(data_dict, min_score=0):
     return results
 
 
-def send_email(results, indices, smtp_config, recipients, top_n=30):
+def send_email(results, indices, smtp_config, recipients, top_n=999):
     import csv
     import io
     import smtplib
@@ -315,7 +315,7 @@ def main():
     parser.add_argument("-all", action="store_true")
     parser.add_argument("--all-us", action="store_true")
     parser.add_argument("--watchlist", type=str, help="Scan a watchlist file instead of an index")
-    parser.add_argument("--min-score", type=int, default=0, help="Minimum score threshold (default: 0)")
+    parser.add_argument("--min-score", type=int, default=40, help="Minimum score threshold (default: 40)")
     parser.add_argument("--top", type=int, default=0, help="Show only top N results")
     parser.add_argument("--no-email", action="store_true")
     parser.add_argument("--refresh", action="store_true")
