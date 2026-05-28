@@ -10,7 +10,8 @@ import pandas as pd
 import yfinance as yf
 from dotenv import load_dotenv
 
-load_dotenv()
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_script_dir, ".env"))
 
 from portfolio_tracker import load_transactions, fifo_match, get_portfolio_summary
 from minervini.sell_signals import compute_exhaustion_score, compute_distribution_score
@@ -18,7 +19,7 @@ from minervini.indicators import compute_sma, compute_ad_rating
 from minervini.violations import compute_violations
 
 
-JOURNAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "journal.csv")
+JOURNAL_PATH = os.path.join(_script_dir, "journal.csv")
 
 
 def load_transactions_from_sheet():
@@ -28,6 +29,8 @@ def load_transactions_from_sheet():
     sheet_id = os.getenv("SHEET_ID")
     if not creds_file or not sheet_id:
         raise ValueError("GOOGLE_CREDENTIALS and SHEET_ID must be set in .env")
+    if not os.path.isabs(creds_file):
+        creds_file = os.path.join(_script_dir, creds_file)
 
     _gai = socket.getaddrinfo
     try:

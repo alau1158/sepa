@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import yfinance as yf
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 
 def read_watchlist(path):
@@ -131,8 +131,9 @@ def parse_recipients(raw):
 
 
 def main():
+    _script_dir = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser(description="Watchlist news summarizer")
-    parser.add_argument("--watchlist", default="watchlist.txt", help="Path to watchlist file (one ticker per line)")
+    parser.add_argument("--watchlist", default=os.path.join(_script_dir, "watchlist.txt"), help="Path to watchlist file (one ticker per line)")
     parser.add_argument("--no-email", action="store_true", help="Print to console only")
     args = parser.parse_args()
 
