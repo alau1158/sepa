@@ -9,14 +9,13 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
+from portfolio_tracker import load_transactions_from_sheet, fifo_match
 
-def read_watchlist(path):
-    tickers = []
-    with open(path) as f:
-        for line in f:
-            line = line.split("#")[0].strip()
-            if line:
-                tickers.append(line.upper())
+
+def get_open_tickers():
+    transactions = load_transactions_from_sheet()
+    open_positions, _ = fifo_match(transactions)
+    tickers = sorted({t for _, t in open_positions})
     return tickers
 
 
@@ -131,22 +130,16 @@ def parse_recipients(raw):
 
 
 def main():
-    _script_dir = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser(description="Watchlist news summarizer")
-    parser.add_argument("--watchlist", default=os.path.join(_script_dir, "watchlist.txt"), help="Path to watchlist file (one ticker per line)")
     parser.add_argument("--no-email", action="store_true", help="Print to console only")
     args = parser.parse_args()
 
-    if not os.path.exists(args.watchlist):
-        print(f"Watchlist file not found: {args.watchlist}")
-        sys.exit(1)
-
-    tickers = read_watchlist(args.watchlist)
+    tickers = get_open_tickers()
     if not tickers:
-        print("No tickers found in watchlist.")
+        print("No open positions found.")
         sys.exit(1)
 
-    print(f"Watchlist: {', '.join(tickers)}")
+    print(f"Watchlist ({len(tickers)} open positions): {', '.join(tickers)}")
     print("Fetching news...")
 
     news_by_ticker = {}

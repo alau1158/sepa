@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import smtplib
-import socket
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -13,50 +12,13 @@ from dotenv import load_dotenv
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_script_dir, ".env"))
 
-from portfolio_tracker import load_transactions, fifo_match, get_portfolio_summary
+from portfolio_tracker import load_transactions, load_transactions_from_sheet, fifo_match, get_portfolio_summary
 from minervini.sell_signals import compute_exhaustion_score, compute_distribution_score
 from minervini.indicators import compute_sma, compute_ad_rating
 from minervini.violations import compute_violations
 
 
 JOURNAL_PATH = os.path.join(_script_dir, "journal.csv")
-
-
-def load_transactions_from_sheet():
-    import gspread
-
-    creds_file = os.getenv("GOOGLE_CREDENTIALS")
-    sheet_id = os.getenv("SHEET_ID")
-    if not creds_file or not sheet_id:
-        raise ValueError("GOOGLE_CREDENTIALS and SHEET_ID must be set in .env")
-    if not os.path.isabs(creds_file):
-        creds_file = os.path.join(_script_dir, creds_file)
-
-    _gai = socket.getaddrinfo
-    try:
-        socket.getaddrinfo = lambda *a, **kw: [
-            r for r in _gai(*a, **kw) if r[0] == socket.AF_INET
-        ]
-        gc = gspread.service_account(filename=creds_file)
-        sh = gc.open_by_key(sheet_id)
-        ws = sh.sheet1
-        records = ws.get_all_values()
-    finally:
-        socket.getaddrinfo = _gai
-
-    df = pd.DataFrame(records[1:], columns=records[0])
-    df.columns = df.columns.str.strip().str.lower()
-    df["action"] = df["action"].str.strip().str.lower()
-    df["ticket"] = df["ticket"].str.strip().str.upper()
-    df["broker"] = df["broker"].str.strip().str.lower()
-    df["quantity"] = pd.to_numeric(df["quantity"].astype(str).str.replace(r'[\$,]', '', regex=True), errors="coerce")
-    df["price"] = pd.to_numeric(df["price"].astype(str).str.replace(r'[\$,]', '', regex=True), errors="coerce")
-    df["date"] = pd.to_datetime(
-        df["date"].astype(str).str.strip(), format="%Y%m%d", errors="coerce"
-    )
-    df = df.dropna(subset=["date", "quantity", "price"])
-    df = df.sort_values(["date", "action"]).reset_index(drop=True)
-    return df
 
 
 def load_portfolio(from_csv=False):
