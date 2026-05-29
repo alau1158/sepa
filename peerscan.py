@@ -20,23 +20,40 @@ from minervini.indicators import compute_ad_rating
 
 
 def get_ticker_industry(ticker):
-    try:
-        t = yf.Ticker(ticker)
-        info = t.info
-        ind = info.get("industry") or info.get("sector") or "Unknown"
-        sector = info.get("sector", "Unknown")
-        name = info.get("shortName") or info.get("longName") or ticker
-        return ind, sector, name
-    except Exception as e:
-        print(f"  Error fetching {ticker} info: {e}")
-        return None, None, None
+    from minervini.fundamentals import _load_fund_cache, _save_fund_cache
+    import time
+    cache = _load_fund_cache()
+    ind_map = cache.get("industries", {})
+    ind = ind_map.get(ticker)
+    if ind:
+        return ind, None, ticker
+    for attempt in range(3):
+        try:
+            t = yf.Ticker(ticker)
+            info = t.info
+            ind = info.get("industry") or info.get("sector") or "Unknown"
+            sector = info.get("sector", "Unknown")
+            name = info.get("shortName") or info.get("longName") or ticker
+            cache.setdefault("industries", {})[ticker] = ind
+            _save_fund_cache(cache)
+            return ind, sector, name
+        except Exception as e:
+            if "rate" in str(e).lower() or "429" in str(e):
+                wait = 2 ** attempt
+                print(f"  Rate limited, retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"  Error fetching {ticker} info: {e}")
+                return None, None, None
+    print(f"  Could not determine industry for {ticker} (rate limited).")
+    return None, None, None
 
 
 def load_universe():
     indices = ["sp500", "sp400", "sp600", "nasdaq", "nyse"]
     all_tickers = {}
     for idx in indices:
-        cache = load_cache(idx)
+        cache = load_cache(idx, max_age_hours=1e9)
         if cache:
             for t, df in cache["data"].items():
                 if t not in all_tickers and t != "SPY":
@@ -108,6 +125,7 @@ def main():
     parser.add_argument("-i", "--interactive", action="store_true", help="Interactive ticker input")
     parser.add_argument("--top", type=int, default=30, help="Show top N peers (default: 30)")
     parser.add_argument("--min-score", type=int, default=0, help="Minimum momentum score")
+    parser.add_argument("--industry", type=str, help="Industry name (bypass yfinance lookup)")
     parser.add_argument("--no-email", action="store_true", help="Print to console only")
     args = parser.parse_args()
 
@@ -121,10 +139,16 @@ def main():
     ticker = ticker.upper()
 
     print(f"Looking up {ticker}...")
-    industry, sector, name = get_ticker_industry(ticker)
-    if not industry:
-        print(f"  Could not determine industry for {ticker}.")
-        sys.exit(1)
+    if args.industry:
+        industry = args.industry
+        sector = None
+        name = ticker
+    else:
+        industry, sector, name = get_ticker_industry(ticker)
+        if not industry:
+            print(f"  Could not determine industry for {ticker}.")
+            print(f"  Retry with: --industry \"INDUSTRY_NAME\"")
+            sys.exit(1)
 
     print(f"  {name} ({ticker})")
     print(f"  Sector: {sector}")
