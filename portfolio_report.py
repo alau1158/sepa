@@ -151,10 +151,10 @@ def build_html_report(open_results, closed_trades):
         open_rows += f"""<tr style="background-color:{color};">
 <td>{r["broker"]}</td>
 <td><a href="https://www.tradingview.com/chart/?symbol={r["ticker"]}" style="color:{tcolor};text-decoration:none;font-weight:bold;">{r["ticker"]}</a></td>
+<td style="color:{tcolor};font-weight:bold;">{r["pnl_pct"]:+.2f}%<br>${r["pnl_dollar"]:+.2f}</td>
 <td>{r["shares"]}</td>
 <td>${r["current_price"]:.2f}</td>
 <td>${r["entry"]:.2f}</td>
-<td style="color:{tcolor};font-weight:bold;">{r["pnl_pct"]:+.2f}%<br>${r["pnl_dollar"]:+.2f}</td>
 <td>{days}</td>
 <td>{vs50}</td>
 <td>{ad}</td>
@@ -228,7 +228,7 @@ td {{ padding:8px; border:1px solid #ddd; }}
 <h3>Open Positions</h3>
 <table>
 <tr>
-<th>Broker</th><th>Ticker</th><th>Shares</th><th>Price</th><th>Entry</th><th>P&amp;L</th>
+<th>Broker</th><th>Ticker</th><th>P&amp;L</th><th>Shares</th><th>Price</th><th>Entry</th>
 <th>Held</th><th>vs 50 SMA</th><th>A/D</th><th>Viol</th><th>V Sc</th><th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>
 </tr>
 {open_rows}
