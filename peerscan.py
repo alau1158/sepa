@@ -38,7 +38,8 @@ def get_ticker_industry(ticker):
             _save_fund_cache(cache)
             return ind, sector, name
         except Exception as e:
-            if "rate" in str(e).lower() or "429" in str(e):
+            msg = str(e).lower()
+            if "rate" in msg or "429" in msg or "400" in msg or "bad request" in msg:
                 wait = 2 ** attempt
                 print(f"  Rate limited, retrying in {wait}s...")
                 time.sleep(wait)

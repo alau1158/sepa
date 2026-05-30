@@ -55,27 +55,41 @@ def get_industries(tickers, force_refresh=False):
 
 
 def _fetch_industries(tickers):
+    import time
     result = {}
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        fut_map = {ex.submit(_get_industry, t): t for t in tickers}
-        for f in as_completed(fut_map):
-            t = fut_map[f]
-            try:
-                ind = f.result()
-                if ind:
-                    result[t] = ind
-            except Exception:
-                pass
+    batch_size = 100
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        for i in range(0, len(tickers), batch_size):
+            batch = tickers[i:i + batch_size]
+            fut_map = {ex.submit(_get_industry, t): t for t in batch}
+            for f in as_completed(fut_map):
+                t = fut_map[f]
+                try:
+                    ind = f.result()
+                    if ind:
+                        result[t] = ind
+                except Exception:
+                    pass
+            if i + batch_size < len(tickers):
+                time.sleep(2)
     return result
 
 
 def _get_industry(ticker):
-    try:
-        t = yf.Ticker(ticker)
-        info = t.info
-        return info.get("industry") or info.get("sector") or "Unknown"
-    except Exception:
-        return None
+    import time
+    for attempt in range(3):
+        try:
+            t = yf.Ticker(ticker)
+            info = t.info
+            return info.get("industry") or info.get("sector") or "Unknown"
+        except Exception as e:
+            msg = str(e).lower()
+            if "rate" in msg or "429" in msg or "400" in msg or "bad request" in msg:
+                wait = 2 ** attempt
+                time.sleep(wait)
+            else:
+                return None
+    return None
 
 
 def compute_industry_ranks(passing_tickers, rs_ratings, industries):
