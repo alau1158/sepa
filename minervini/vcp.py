@@ -1,83 +1,137 @@
 import pandas as pd
 
 
+def _find_swing_points(series, window=5):
+    """Find swing high (H) and swing low (L) indices in a price Series.
+    Returns list of (index, type, value).
+    """
+    points = []
+    for i in range(window, len(series) - window):
+        seg = series.iloc[i - window : i + window + 1]
+        if series.iloc[i] == seg.max():
+            points.append((i, "H", series.iloc[i]))
+        if series.iloc[i] == seg.min():
+            points.append((i, "L", series.iloc[i]))
+    if not points:
+        return []
+    cleaned = [points[0]]
+    for p in points[1:]:
+        if p[1] == cleaned[-1][1]:
+            if p[1] == "H" and p[2] > cleaned[-1][2]:
+                cleaned[-1] = p
+            elif p[1] == "L" and p[2] < cleaned[-1][2]:
+                cleaned[-1] = p
+        else:
+            cleaned.append(p)
+    return cleaned
+
+
 def detect_vcp(df):
-    if len(df) < 55:
+    """Minervini Volatility Contraction Pattern detection.
+    Uses swing-based pullback identification with halving rule, final
+    tightness, and volume dry-up confirmation.
+    """
+    if len(df) < 30:
         return "No VCP", 0
 
-    formation = df.iloc[-55:-5]
-    action = df.iloc[-5:]
+    close = df["Close"]
+    high = df["High"]
+    vol = df["Volume"]
+    vol_50d = vol.rolling(50).mean()
 
-    n = len(formation)
-    chunk = max(1, n // 5)
+    lookback = min(225, len(df))
+    segment = df.iloc[-lookback:]
 
-    ranges = []
-    volumes = []
-    for i in range(5):
-        w = formation.iloc[i * chunk : (i + 1) * chunk]
-        if len(w) < 2:
-            return "No VCP", 0
-        r = (w["High"].max() - w["Low"].min()) / w["Close"].mean() * 100
-        v = w["Volume"].mean()
-        ranges.append(r)
-        volumes.append(v)
+    swings = _find_swing_points(segment["Close"])
+    if len(swings) < 2:
+        return "No VCP", 0
+
+    highs = [(i, v) for i, t, v in swings if t == "H"]
+    if not highs:
+        return "No VCP", 0
+
+    base_top_idx, _ = max(highs, key=lambda x: x[1])
+
+    post_top = [s for s in swings if s[0] >= base_top_idx]
+
+    pullbacks = []
+    for i in range(len(post_top) - 1):
+        if post_top[i][1] == "H" and post_top[i + 1][1] == "L":
+            depth = (post_top[i][2] - post_top[i + 1][2]) / post_top[i][2] * 100
+            if depth >= 3:
+                pullbacks.append({
+                    "depth": depth,
+                    "high_price": post_top[i][2],
+                    "low_price": post_top[i + 1][2],
+                })
+
+    T = len(pullbacks)
+    if T < 2:
+        return "No VCP", 0
 
     score = 0
 
-    rc = 0
-    for i in range(1, 5):
-        thresh = 0.88 + (i - 1) * 0.03
-        if ranges[i] < ranges[i - 1] * thresh:
-            rc += 1
-
-    if ranges[4] <= min(ranges[:4]) * 1.02:
-        rc += 1
-
-    avg_first_two = (ranges[0] + ranges[1]) / 2
-    avg_last_two = (ranges[3] + ranges[4]) / 2
-
-    if avg_last_two < avg_first_two:
-        rc += 1
-
-    if avg_last_two < avg_first_two * 0.75 and ranges[4] < ranges[3] * 1.10:
-        rc += 1
-    score += rc * 10
-
-    vc = 0
-    for i in range(1, 5):
-        if volumes[i] < volumes[i - 1] * 0.90:
-            vc += 1
-    avg_v_first = (volumes[0] + volumes[1]) / 2
-    avg_v_last = (volumes[3] + volumes[4]) / 2
-    if avg_v_last < avg_v_first * 0.80 and volumes[4] < volumes[3] * 1.10:
-        vc += 1
-    score += vc * 5
-
-    base_high = formation["High"].max()
-    action_close = action["Close"].iloc[-1]
-    action_vol = action["Volume"].mean()
-    formation_vol = formation["Volume"].mean()
-
-    avg_daily_range = (formation["High"] - formation["Low"]).mean()
-    avg_daily_range_pct = avg_daily_range / formation["Close"].mean() * 100
-    power_day = any(
-        (r["High"] - r["Low"]) / r["Close"] * 100 > avg_daily_range_pct * 2
-        and r["Close"] > r["High"] * 0.90
-        for _, r in action.iterrows()
-    )
-    action_sma5 = action["Close"].mean()
-    if power_day and action_close > action_sma5:
+    # 1) Base Duration (10 pts) — 2 to 45 weeks
+    base_dur = len(segment) - base_top_idx
+    if 14 <= base_dur <= 225:
         score += 10
 
-    if action_vol > formation_vol * 1.2:
+    # 2) Pullback Count (10 pts)
+    score += min(10, T * 5)
+
+    # 3) Halving Rule (25 pts)
+    halving_ok = True
+    for i in range(1, T):
+        if pullbacks[i]["depth"] > pullbacks[i - 1]["depth"] * 0.65:
+            halving_ok = False
+            break
+    if halving_ok:
+        score += 25
+    elif T >= 2:
+        ok = sum(1 for i in range(1, T)
+                 if pullbacks[i]["depth"] <= pullbacks[i - 1]["depth"] * 0.65)
+        score += int(25 * ok / (T - 1))
+
+    # 4) Final Tightness (25 pts)
+    final_depth = pullbacks[-1]["depth"]
+    if final_depth <= 7:
+        score += 25
+    elif final_depth <= 10:
+        score += 20
+    elif final_depth <= 15:
         score += 10
 
-    if action_close > base_high:
-        score += 10
-        if action_close >= base_high * 1.02:
+    # 5) Volume Dry-Up (15 pts) — last 5d vs 50d avg
+    recent_vol = vol.iloc[-5:].mean()
+    vol_avg = vol_50d.iloc[-1] if not pd.isna(vol_50d.iloc[-1]) else 0
+    if vol_avg > 0:
+        vol_ratio = recent_vol / vol_avg
+        if vol_ratio < 0.7:
+            score += 15
+        elif vol_ratio < 0.9:
+            score += 10
+        elif vol_ratio < 1.1:
             score += 5
 
-    score = int(min(100, score))
+    # 6) Selling Vacuum (10 pts) — 1+ day at base-lowest volume
+    base_vol = segment["Volume"]
+    if len(base_vol) > 0:
+        min_vol = base_vol.min()
+        recent_min = vol.iloc[-10:].min()
+        if recent_min == min_vol:
+            score += 10
+        elif not pd.isna(vol_avg) and vol.iloc[-1] < vol_avg * 0.5:
+            score += 5
+
+    # 7) Breakout Trigger (5 pts)
+    tight_high = high.iloc[-5:].max()
+    latest_close = close.iloc[-1]
+    latest_vol = vol.iloc[-1]
+    if latest_close > tight_high and not pd.isna(vol_avg) and vol_avg > 0:
+        if latest_vol > vol_avg * 1.25:
+            score += 5
+
+    score = int(min(100, max(0, score)))
 
     if score >= 60:
         status = "VCP Tight"

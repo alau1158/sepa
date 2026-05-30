@@ -91,9 +91,13 @@ For a stock showing strong relative and institutional characteristics, look for:
 
 | Component | Max Pts | Method |
 |-----------|---------|--------|
-| Range contraction | 50 | 5-window ~10d splits, progressive tightening checks |
-| Volume dry-up | 25 | 5-window volume decline check |
-| Breakout | 25 | Price above base high + volume confirmation + extension |
+| Base Duration | 10 | Consolidation 14–225 days (2–45 weeks) |
+| Pullback Count (T) | 10 | ≥2 distinct swings, 3–35% depth each |
+| Halving Rule | 25 | Each successive pullback ~½ depth of prior |
+| Final Tightness | 25 | Last pullback range ≤10% (≤7% ideal) |
+| Volume Dry-Up | 15 | Last 5d avg volume < 50d SMA |
+| Selling Vacuum | 10 | 1+ days at lowest volume in entire base |
+| Breakout Trigger | 5 | Price above tight area + volume surge ≥125% of 50d avg |
 
 ### A/D Rating Thresholds
 
