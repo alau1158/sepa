@@ -48,9 +48,9 @@ def fetch_news(ticker, max_days=7):
 
 
 def summarize_ticker(ticker, items, api_key):
-    from google import genai
+    from openai import OpenAI
 
-    client = genai.Client(api_key=api_key)
+    client = OpenAI(api_key=api_key, base_url="https://opencode.ai/zen/go/v1")
 
     lines = []
     for item in items:
@@ -65,8 +65,11 @@ def summarize_ticker(ticker, items, api_key):
 
 Summarize the key developments in 1-2 concise paragraphs. Focus on material events, earnings, product launches, regulatory changes, and sector trends. Omit routine price commentary."""
 
-    response = client.models.generate_content(model="gemini-3.5-flash", contents=prompt)
-    return response.text
+    response = client.chat.completions.create(
+        model="deepseek-v4-flash",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
 
 
 def send_news_email(per_ticker_summaries, news_by_ticker, smtp_config, recipients):
@@ -153,12 +156,12 @@ def main():
         print("No news found. Nothing to summarize.")
         return
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("OPENCODE_GO_API_KEY")
     if not api_key:
-        print("GEMINI_API_KEY not set in .env")
+        print("OPENCODE_GO_API_KEY not set in .env")
         sys.exit(1)
 
-    print("Summarizing with Gemini...")
+    print("Summarizing with DeepSeek V4 Flash...")
     per_ticker_summaries = {}
     for ticker, items in news_by_ticker.items():
         if not items:
