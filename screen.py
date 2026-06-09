@@ -65,7 +65,7 @@ def main():
         if cache:
             data_dict = cache["data"]
         else:
-            print("  Fetching ticker list...")
+            print("  Fetching ticker list...", flush=True)
             try:
                 tickers = get_tickers(index)
             except Exception as e:
@@ -77,13 +77,13 @@ def main():
                 continue
 
             min_price = 15 if index in ("nasdaq", "nyse") else None
-            print(f"  Found {len(tickers)} stocks. Downloading data (this may take a while)...")
+            print(f"  Found {len(tickers)} stocks. Downloading data (this may take a while)...", flush=True)
             data_dict, failed = download_data(tickers, min_price=min_price)
-            print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)")
+            print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)", flush=True)
             save_cache(index, tickers, data_dict, failed)
 
         data_dict["SPY"] = spy_data
-        print("  Running screener...")
+        print("  Running screener...", flush=True)
         results = screen_stocks(data_dict)
 
         if not results.empty:

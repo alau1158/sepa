@@ -66,7 +66,7 @@ def summarize_ticker(ticker, items, api_key):
 Summarize the key developments in 1-2 concise paragraphs. Focus on material events, earnings, product launches, regulatory changes, and sector trends. Omit routine price commentary."""
 
     response = client.chat.completions.create(
-        model="deepseek-v4-flash",
+        model="mimo-v2.5",
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content

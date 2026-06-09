@@ -1,5 +1,6 @@
 import os
 import pickle
+import time
 from datetime import datetime
 from io import StringIO
 
@@ -89,7 +90,7 @@ def get_tickers(index):
     return fn()
 
 
-def download_data(tickers, period="2y", batch_size=100, min_price=None):
+def download_data(tickers, period="2y", batch_size=50, min_price=None):
     all_data = {}
     failed = []
     filtered = 0
@@ -131,6 +132,7 @@ def download_data(tickers, period="2y", batch_size=100, min_price=None):
                     failed.extend(batch)
         except Exception:
             failed.extend(batch)
+        time.sleep(0.5)
 
     if filtered:
         print(f"  Filtered {filtered} stocks below ${min_price}")

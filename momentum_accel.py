@@ -360,18 +360,18 @@ def main():
             if cache:
                 data_dict = cache["data"]
             else:
-                print("  Downloading...")
+                print("  Downloading...", flush=True)
                 tickers = get_tickers(index)
                 if not tickers:
                     continue
                 min_price = 15 if index in ("nasdaq", "nyse") else None
                 data_dict, failed = download_data(tickers, min_price=min_price)
-                print(f"  Downloaded {len(data_dict)} stocks")
+                print(f"  Downloaded {len(data_dict)} stocks", flush=True)
                 save_cache(index, tickers, data_dict, failed)
 
             results = get_results(data_dict, min_score=args.min_score)
             if results:
-                print(f"  {len(results)} stocks above min-score {args.min_score}")
+                print(f"  {len(results)} stocks above min-score {args.min_score}", flush=True)
                 all_results.extend(results)
 
         if len(indices) > 1:
