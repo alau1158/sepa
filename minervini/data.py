@@ -90,49 +90,93 @@ def get_tickers(index):
     return fn()
 
 
-def download_data(tickers, period="2y", batch_size=50, min_price=None):
+def _download_batch(batch, period, min_price, all_data, filtered):
+    """Download a single batch and return (new_data_dict, filtered_count)."""
+    data = yf.download(
+        batch,
+        period=period,
+        group_by="ticker",
+        auto_adjust=True,
+        threads=True,
+        progress=False,
+    )
+
+    new_data = {}
+    new_filtered = 0
+
+    if isinstance(data.columns, pd.MultiIndex):
+        for ticker in batch:
+            try:
+                td = data[ticker]
+                if isinstance(td, pd.DataFrame) and not td.empty:
+                    if min_price is not None:
+                        last_close = td["Close"].iloc[-1]
+                        if pd.isna(last_close) or last_close < min_price:
+                            new_filtered += 1
+                            continue
+                    new_data[ticker] = td
+            except (KeyError, Exception):
+                pass
+    else:
+        if batch and not data.empty:
+            if min_price is None or data["Close"].iloc[-1] >= min_price:
+                new_data[batch[0]] = data
+            else:
+                new_filtered += 1
+
+    return new_data, new_filtered
+
+
+def download_data(tickers, period="2y", batch_size=25, min_price=None):
     all_data = {}
     failed = []
     filtered = 0
+    total_batches = (len(tickers) + batch_size - 1) // batch_size
 
+    # Main pass: smaller batches with generous sleep
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i : i + batch_size]
+        batch_num = (i // batch_size) + 1
         try:
-            data = yf.download(
-                batch,
-                period=period,
-                group_by="ticker",
-                auto_adjust=True,
-                threads=True,
-                progress=False,
-            )
+            new_data, new_filtered = _download_batch(batch, period, min_price, all_data, filtered)
+            all_data.update(new_data)
+            filtered += new_filtered
 
-            if isinstance(data.columns, pd.MultiIndex):
-                for ticker in batch:
-                    try:
-                        td = data[ticker]
-                        if isinstance(td, pd.DataFrame) and not td.empty:
-                            if min_price is not None:
-                                last_close = td["Close"].iloc[-1]
-                                if pd.isna(last_close) or last_close < min_price:
-                                    filtered += 1
-                                    continue
-                            all_data[ticker] = td
-                        else:
-                            failed.append(ticker)
-                    except (KeyError, Exception):
-                        failed.append(ticker)
-            else:
-                if batch and not data.empty:
-                    if min_price is None or data["Close"].iloc[-1] >= min_price:
-                        all_data[batch[0]] = data
-                    else:
-                        filtered += 1
-                else:
-                    failed.extend(batch)
+            # Track failed tickers in this batch
+            batch_set = set(batch)
+            succeeded = set(new_data.keys())
+            for t in batch:
+                if t not in succeeded:
+                    failed.append(t)
+
+            if batch_num % 20 == 0 or batch_num == total_batches:
+                print(f"  Progress: {batch_num}/{total_batches} batches ({len(all_data)} stocks loaded, {len(failed)} failed)", flush=True)
         except Exception:
             failed.extend(batch)
-        time.sleep(0.5)
+
+        time.sleep(5.0)
+
+    # Retry pass: failed tickers one at a time with longer sleep
+    if failed:
+        print(f"\n  Retry pass: {len(failed)} failed tickers (one-at-a-time, 5s between)", flush=True)
+        retry_failed = []
+        for i, ticker in enumerate(failed):
+            try:
+                new_data, new_filtered = _download_batch([ticker], period, min_price, all_data, filtered)
+                all_data.update(new_data)
+                filtered += new_filtered
+                if ticker not in all_data:
+                    retry_failed.append(ticker)
+            except Exception:
+                retry_failed.append(ticker)
+
+            if (i + 1) % 50 == 0:
+                print(f"  Retry progress: {i+1}/{len(failed)} ({len(retry_failed)} still failed)", flush=True)
+            time.sleep(5.0)
+
+        failed = retry_failed
+        if failed:
+            print(f"  Final failed count: {len(failed)}", flush=True)
 
     if filtered:
         print(f"  Filtered {filtered} stocks below ${min_price}")
