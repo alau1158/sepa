@@ -5,7 +5,7 @@ def _pct_chg(a, b):
     return (a - b) / b * 100
 
 
-def compute_exhaustion_score(df):
+def compute_exhaustion_score(df, ticker=None):
     """Exhaustion / climax-run detection (0–100). Higher = more overextended."""
     close = df["Close"]
     high = df["High"]
@@ -100,10 +100,18 @@ def compute_exhaustion_score(df):
     elif churn_count >= 1:
         score += 3
 
-    # ── 6. P/E Expansion (10 pts) ───────────────────────────────────
+    # ── 6. P/E Expansion (10 pts) ─────────────────────────────
+    # Note: requires a ticker argument. The screener passes one. Callers that
+    # don't have a ticker (older portfolio_report code) will simply skip this
+    # component — the 10 pts are not allocated rather than miscounted.
+    info = None
+    if ticker:
+        try:
+            from yfinance import Ticker
+            info = Ticker(ticker).info
+        except Exception:
+            info = None
     try:
-        from yfinance import Ticker
-        info = Ticker(df.name if hasattr(df, "name") else "").info
         if info and "trailingPE" in info:
             pe_now = info["trailingPE"]
             if pe_now and pe_now > 0:
@@ -113,7 +121,7 @@ def compute_exhaustion_score(df):
                     score += 10
                 elif pe_start_est > 0 and pe_now / pe_start_est >= 1.5:
                     score += 5
-    except Exception:
+    except (TypeError, KeyError):
         pass
 
     score = min(100, max(0, score))

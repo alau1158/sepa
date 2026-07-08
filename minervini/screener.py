@@ -126,7 +126,7 @@ def screen_stocks(data_dict):
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]
         df = data_dict[ticker]
-        ex_score, ex_status = sell.compute_exhaustion_score(df)
+        ex_score, ex_status = sell.compute_exhaustion_score(df, ticker=ticker)
         di_score, di_status = sell.compute_distribution_score(df)
         df_results.at[idx, "Exh_Score"] = ex_score
         df_results.at[idx, "Exh_Status"] = ex_status

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+WEEK_LOOKBACK = 252  # 52 weeks of trading days; SEPA Trend Template uses 52w lookback
+
 
 def compute_sma(series, period):
     return series.rolling(window=period).mean()
@@ -41,15 +43,19 @@ def compute_atr(df, period=22):
     return tr.rolling(window=period).mean()
 
 
-def above_52w_low_pct(df):
+def above_52w_low_pct(df, lookback=WEEK_LOOKBACK):
+    if len(df) < lookback:
+        return None
     current = df["Close"].iloc[-1]
-    low_52w = df["Close"].min()
+    low_52w = df["Close"].iloc[-lookback:].min()
     return ((current - low_52w) / low_52w) * 100
 
 
-def within_52w_high_pct(df):
+def within_52w_high_pct(df, lookback=WEEK_LOOKBACK):
+    if len(df) < lookback:
+        return None
     current = df["Close"].iloc[-1]
-    high_52w = df["Close"].max()
+    high_52w = df["Close"].iloc[-lookback:].max()
     return ((high_52w - current) / high_52w) * 100
 
 
