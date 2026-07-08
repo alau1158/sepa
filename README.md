@@ -315,9 +315,19 @@ SHEET_ID=your_sheet_id_here
 
 ## Caching
 
+Price data freshness is managed by **cron**, not by the on-demand screener. The
+screener reads whatever cache file exists; it does NOT trigger a refresh if
+the data is "old." This avoids hammering Yahoo Finance when you just want a
+quick read.
+
+Refresh schedule (Pacific time, weekdays):
+- 7:00am â first 30 min of trading
+- 10:00am â mid-morning
+- 1:00pm â lunch / pre-SEPA-email
+
 | Cache | File | Expiry |
 |-------|------|--------|
-| Price data | `cache_{index}.pkl` | 6 hours |
+| Price data | `cache_{index}.pkl` | 7 days (sanity guard; cron refreshes 3x/day) |
 | Fundamentals (industries, EPS, earnings) | `cache_fundamentals.pkl` | Industries: 7 days, EPS: 24h, Earnings: 24h |
 
 Use `--refresh` to force re-download price data. Delete `cache_fundamentals.pkl` manually to reset fundamental data.

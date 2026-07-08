@@ -218,15 +218,24 @@ def save_cache(index, tickers, data, failed=None):
         pickle.dump(cache, f)
 
 
-def load_cache(index, max_age_hours=6):
+def load_cache(index, max_age_hours=168):
+    """Load the cache file. Freshness is managed by cron, not here.
+
+    The max_age_hours check is now a sanity guard (default 7 days)
+    — if the cache is genuinely ancient or missing, fall through to
+    a fresh download. Otherwise trust whatever the cron last wrote.
+
+    To force a refresh, pass --refresh on the CLI (screen.py handles
+    that flag and bypasses the cache entirely).
+    """
     try:
         with open(CACHE_FILE.format(index), "rb") as f:
             cache = pickle.load(f)
         age = (datetime.now() - cache["timestamp"]).total_seconds() / 3600
         if age > max_age_hours:
-            print(f"  Cache expired ({age:.1f}h old), re-downloading...")
+            print(f"  Cache very stale ({age:.1f}h old > {max_age_hours}h), re-downloading...")
             return None
-        print(f"  Loaded cached data from {cache['timestamp'].strftime('%Y-%m-%d %H:%M')}")
+        print(f"  Loaded cached data from {cache['timestamp'].strftime('%Y-%m-%d %H:%M')} ({age:.1f}h old)")
         return cache
     except (FileNotFoundError, Exception):
         return None
