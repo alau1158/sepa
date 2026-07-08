@@ -187,10 +187,10 @@ def detect_vcp(df):
     score = 0
     base_duration = len(seg) - 1 - resistance_idx
 
-    # 4a) Base Duration (10 pts) — ideal 7-25 weeks, acceptable 5-45 weeks
-    if 49 <= base_duration <= 125:
+    # 4a) Base Duration (10 pts) — ideal 7-30 weeks, acceptable 5-50 weeks
+    if 35 <= base_duration <= 150:    # 7-30 weeks
         score += 10
-    elif 25 <= base_duration <= 225:
+    elif 25 <= base_duration <= 250:  # 5-50 weeks
         score += 5
 
     # 4b) Contraction Count (10 pts) — 2-6 is ideal
@@ -199,12 +199,12 @@ def detect_vcp(df):
     else:
         score += 3
 
-    # 4c) Halving Rule (25 pts) — each contraction <=65% of previous
+    # 4c) Halving Rule (25 pts) — each contraction <=60% of previous
     halving_passes = 0
     halving_total = 0
     for i in range(1, T):
         halving_total += 1
-        if contractions[i]["depth"] <= contractions[i - 1]["depth"] * 0.65:
+        if contractions[i]["depth"] <= contractions[i - 1]["depth"] * 0.60:
             halving_passes += 1
 
     if halving_total > 0:
