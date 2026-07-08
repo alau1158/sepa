@@ -6,6 +6,7 @@ from . import vcp as vcp_module
 from . import sell_signals as sell
 from . import earnings as earn
 from . import fundamentals as fund
+from .violations import compute_violations
 
 
 def screen_stocks(data_dict):
@@ -16,7 +17,7 @@ def screen_stocks(data_dict):
 
     results = []
     for ticker, df in data_dict.items():
-        if len(df) < 250:
+        if len(df) < 200:  # 200-day SMA needs ~200 days; was 250 (overly strict)
             continue
 
         try:
@@ -70,6 +71,8 @@ def screen_stocks(data_dict):
                         "Exh_Status": None,
                         "Dist_Score": None,
                         "Dist_Status": None,
+                        "Viol": None,
+                        "V_Sc": None,
                     }
                 )
         except Exception:
@@ -128,10 +131,16 @@ def screen_stocks(data_dict):
         df = data_dict[ticker]
         ex_score, ex_status = sell.compute_exhaustion_score(df, ticker=ticker)
         di_score, di_status = sell.compute_distribution_score(df)
+        # 8 Minervini post-purchase violation checks. Useful pre-purchase too —
+        # flags stocks already showing distribution / 20-SMA breach signals
+        # before you even consider entry.
+        viol_count, viol_score, viol_status, viol_reasons = compute_violations(df)
         df_results.at[idx, "Exh_Score"] = ex_score
         df_results.at[idx, "Exh_Status"] = ex_status
         df_results.at[idx, "Dist_Score"] = di_score
         df_results.at[idx, "Dist_Status"] = di_status
+        df_results.at[idx, "Viol"] = viol_status
+        df_results.at[idx, "V_Sc"] = viol_score
 
     df_results = df_results.sort_values("RS_Rating", ascending=False).reset_index(drop=True)
     return df_results
