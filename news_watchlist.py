@@ -56,7 +56,7 @@ def summarize_ticker(ticker, items, api_key):
     for item in items:
         lines.append(f"  - {item['title']} ({item['publisher']})")
         if item["summary"]:
-            lines.append(f"    {item['summary'][:200]}")
+            lines.append(f"    {item['summary']}")
 
     news_text = "\n".join(lines)
     prompt = f"""You are a financial news analyst. Below is recent news (past week) for {ticker}.

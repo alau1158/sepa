@@ -17,8 +17,75 @@ from minervini.sell_signals import compute_exhaustion_score, compute_distributio
 from minervini.indicators import compute_sma, compute_ad_rating
 from minervini.violations import compute_violations
 
+PROFIT_THRESHOLD = 10.0  # percent — flag positions up this much for partial profit-taking
+
 
 JOURNAL_PATH = os.path.join(_script_dir, "journal.csv")
+
+
+def fetch_es_futures():
+    """Fetch ES futures data for overnight sentiment."""
+    try:
+        # ES=F is the E-mini S&P 500 futures continuous contract
+        es = yf.download("ES=F", period="5d", interval="1d", auto_adjust=True, progress=False)
+        if es.empty:
+            return None
+
+        # Handle MultiIndex columns
+        if isinstance(es.columns, pd.MultiIndex):
+            if "Close" in es.columns.get_level_values(0):
+                es = es.droplevel(1, axis=1)
+            elif "Close" in es.columns.get_level_values(1):
+                es = es.xs("Close", level=0, axis=1).to_frame("Close")
+
+        current = float(es["Close"].iloc[-1])
+        prev_close = float(es["Close"].iloc[-2]) if len(es) >= 2 else current
+        change_pct = ((current - prev_close) / prev_close) * 100
+
+        # Determine risk level
+        if change_pct <= -2.0:
+            risk_level = "HIGH"
+            risk_color = "#dc3545"
+            risk_icon = "🔴"
+            risk_msg = "SEVERE DOWNGRADE — Market panic likely. Consider exiting weak positions."
+        elif change_pct <= -1.0:
+            risk_level = "ELEVATED"
+            risk_color = "#fd7e14"
+            risk_icon = "🟠"
+            risk_msg = "Risk-off overnight. Tighten stops on high-beta positions. Don't add new longs."
+        elif change_pct <= -0.5:
+            risk_level = "CAUTION"
+            risk_color = "#ffc107"
+            risk_icon = "🟡"
+            risk_msg = "Mild negative sentiment. Monitor open positions, no panic needed."
+        elif change_pct >= 1.0:
+            risk_level = "RISK-ON"
+            risk_color = "#28a745"
+            risk_icon = "🟢"
+            risk_msg = "Strong overnight rally. Watch for gap-up fade — don't chase the open."
+        elif change_pct >= 0.3:
+            risk_level = "POSITIVE"
+            risk_color = "#28a745"
+            risk_icon = "🟢"
+            risk_msg = "Mild positive sentiment. Markets supportive for open."
+        else:
+            risk_level = "NEUTRAL"
+            risk_color = "#6c757d"
+            risk_icon = "⚪"
+            risk_msg = "Flat overnight. No directional signal."
+
+        return {
+            "price": current,
+            "prev_close": prev_close,
+            "change_pct": change_pct,
+            "risk_level": risk_level,
+            "risk_color": risk_color,
+            "risk_icon": risk_icon,
+            "risk_msg": risk_msg,
+        }
+    except Exception as e:
+        print(f"  ES futures fetch failed: {e}")
+        return None
 
 
 def load_portfolio(from_csv=False):
@@ -98,6 +165,9 @@ def analyze_open_positions(tickers, entry_prices, shares, brokers, purchase_date
         exh_score, exh_status = compute_exhaustion_score(df)
         dist_score, dist_status = compute_distribution_score(df)
 
+        profit_alert = pnl_pct >= PROFIT_THRESHOLD
+        sell_half_shares = int(share_count / 2) if profit_alert and share_count >= 2 else 0
+
         results.append({
             "broker": brokers.get(key, "").upper(),
             "ticker": ticker,
@@ -117,12 +187,14 @@ def analyze_open_positions(tickers, entry_prices, shares, brokers, purchase_date
             "exh_score": exh_score,
             "dist_status": dist_status,
             "dist_score": dist_score,
+            "profit_alert": profit_alert,
+            "sell_half_shares": sell_half_shares,
         })
 
     return results
 
 
-def build_html_report(open_results, closed_trades):
+def build_html_report(open_results, closed_trades, es_data=None):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     def row_color(pnl):
@@ -135,20 +207,51 @@ def build_html_report(open_results, closed_trades):
         if pnl < 0: return "#721c24"
         return "#856404"
 
+    # ── ES Futures Section ──
+    es_section = ""
+    if es_data:
+        change_color = "#28a745" if es_data["change_pct"] >= 0 else "#dc3545"
+        es_section = f"""
+<div style="margin:15px 0;padding:15px;border:2px solid {es_data['risk_color']};border-radius:8px;background:#f8f9fa;">
+  <h3 style="margin:0 0 8px 0;">{es_data['risk_icon']} Overnight Market Sentiment — ES Futures</h3>
+  <div style="font-size:14px;margin-bottom:8px;">
+    <strong>ES Price:</strong> ${es_data['price']:,.2f} |
+    <strong>Prev Close:</strong> ${es_data['prev_close']:,.2f} |
+    <strong>Change:</strong> <span style="color:{change_color};font-weight:bold;">{es_data['change_pct']:+.2f}%</span>
+  </div>
+  <div style="padding:8px 12px;background:{es_data['risk_color']}20;border-left:4px solid {es_data['risk_color']};border-radius:4px;">
+    <strong style="color:{es_data['risk_color']};">Risk Level: {es_data['risk_level']}</strong><br>
+    <span style="font-size:13px;">{es_data['risk_msg']}</span>
+  </div>
+  <div style="font-size:11px;color:#888;margin-top:8px;">
+    ⚠️ ES futures reflect overnight sentiment, not a guarantee. High-beta stocks (semis, tech) move 2-4x the index.
+    A 1% ES drop can mean 3-5% down on individual stocks.
+  </div>
+</div>"""
+
     # ── Open Positions Table ──
     open_rows = ""
     total_pnl_pct = 0
     total_pnl_dollar = 0
 
+    profit_alert_tickers = []
+
     for r in open_results:
-        color = row_color(r["pnl_pct"])
         tcolor = text_color(r["pnl_pct"])
         days = f"{r['days_held']}d" if r["days_held"] is not None else "N/A"
         vs50 = f"{r['vs_sma50']:+.1f}%" if r["vs_sma50"] is not None else "N/A"
         ad = f"{r['ad_letter']} ({r['ad_score']})"
         viol = f"{r['viol_status']} ({r['viol_score']})"
 
-        open_rows += f"""<tr style="background-color:{color};">
+        if r.get("profit_alert"):
+            row_bg = "#fff3cd"
+            action_cell = f'<td style="background:#ffc107;color:#000;font-weight:bold;text-align:center;">SELL HALF<br>({r["sell_half_shares"]} shares)</td>'
+            profit_alert_tickers.append(r)
+        else:
+            row_bg = row_color(r["pnl_pct"])
+            action_cell = '<td style="color:#888;text-align:center;">—</td>'
+
+        open_rows += f"""<tr style="background-color:{row_bg};">
 <td>{r["broker"]}</td>
 <td><a href="https://www.tradingview.com/chart/?symbol={r["ticker"]}" style="color:{tcolor};text-decoration:none;font-weight:bold;">{r["ticker"]}</a></td>
 <td style="color:{tcolor};font-weight:bold;">{r["pnl_pct"]:+.2f}%<br>${r["pnl_dollar"]:+.2f}</td>
@@ -164,9 +267,28 @@ def build_html_report(open_results, closed_trades):
 <td>{r["exh_score"]}</td>
 <td style="font-weight:bold;">{r["dist_status"]}</td>
 <td>{r["dist_score"]}</td>
+{action_cell}
 </tr>"""
         total_pnl_pct += r["pnl_pct"]
         total_pnl_dollar += r["pnl_dollar"]
+
+    # Build profit alert banner
+    if profit_alert_tickers:
+        banner_items = "".join(
+            f'<li><strong>{t["ticker"]}</strong> ({t["broker"]}): '
+            f'{t["pnl_pct"]:+.1f}% — sell {t["sell_half_shares"]} of {t["shares"]} shares '
+            f'(${t["pnl_dollar"]:+,.2f})</li>'
+            for t in profit_alert_tickers
+        )
+        profit_banner = f"""<div style="margin:15px 0;padding:15px;border:2px solid #ffc107;border-radius:8px;background:#fff8e1;">
+  <h3 style="margin:0 0 8px 0;">💰 Profit Alert — {len(profit_alert_tickers)} position(s) up 10%+</h3>
+  <p style="margin:0 0 8px 0;font-size:14px;">Consider selling half to lock in gains. Let the rest ride with your trailing stop.</p>
+  <ul style="margin:0;padding-left:20px;font-size:14px;">
+    {banner_items}
+  </ul>
+</div>"""
+    else:
+        profit_banner = ""
 
     avg_pnl = total_pnl_pct / len(open_results) if open_results else 0
     total_color = text_color(total_pnl_dollar)
@@ -219,17 +341,19 @@ td {{ padding:8px; border:1px solid #ddd; }}
 <body>
 <h2>Portfolio Report — {now}</h2>
 
+{es_section}
+
 <div class="summary">
 <strong>Open Positions:</strong> {len(open_results)} stocks |
-<strong>Avg P&L:</strong> <span style="color:{total_color}">{avg_pnl:+.2f}%</span> |
-<strong>Total P&L:</strong> <span style="color:{total_color}">${total_pnl_dollar:+.2f}</span>
+<strong>Avg P&amp;L:</strong> <span style="color:{total_color}">{avg_pnl:+.2f}%</span> |
+<strong>Total P&amp;L:</strong> <span style="color:{total_color}">${total_pnl_dollar:+.2f}</span>
 </div>
 
 <h3>Open Positions</h3>
 <table>
 <tr>
 <th>Broker</th><th>Ticker</th><th>P&amp;L</th><th>Shares</th><th>Price</th><th>Entry</th>
-<th>Held</th><th>vs 50 SMA</th><th>A/D</th><th>Viol</th><th>V Sc</th><th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>
+<th>Held</th><th>vs 50 SMA</th><th>A/D</th><th>Viol</th><th>V Sc</th><th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th><th>💰 Action</th>
 </tr>
 {open_rows}
 </table>
@@ -304,6 +428,13 @@ def main():
         print("No open positions to analyze.")
         return
 
+    print("Fetching ES futures data...")
+    es_data = fetch_es_futures()
+    if es_data:
+        print(f"  ES: ${es_data['price']:,.2f} ({es_data['change_pct']:+.2f}%) — Risk: {es_data['risk_level']}")
+    else:
+        print("  ES futures data unavailable")
+
     print("Downloading data and computing signals...")
     open_results = analyze_open_positions(tickers, entry_prices, shares, brokers, purchase_dates)
 
@@ -315,12 +446,16 @@ def main():
               f"Exh: {r['exh_status']} ({r['exh_score']}) | "
               f"Dist: {r['dist_status']} ({r['dist_score']})")
 
-    html = build_html_report(open_results, closed_trades)
+    html = build_html_report(open_results, closed_trades, es_data=es_data)
 
     if args.no_email:
         print("\n" + "=" * 60)
         print("PORTFOLIO REPORT")
         print("=" * 60)
+        if es_data:
+            print(f"ES Futures: ${es_data['price']:,.2f} ({es_data['change_pct']:+.2f}%) — {es_data['risk_level']}")
+            print(f"  {es_data['risk_msg']}")
+            print("-" * 60)
         for r in open_results:
             print(f"{r['broker']}-{r['ticker']}: ${r['current_price']:.2f} "
                   f"(entry ${r['entry']:.2f}, P&L {r['pnl_pct']:+.2f}% / ${r['pnl_dollar']:+.2f})")

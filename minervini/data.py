@@ -6,6 +6,15 @@ from io import StringIO
 
 import urllib.request
 
+# Force IPv4 to avoid Yahoo Finance IPv6 rate limiting
+import socket
+_original_getaddrinfo = socket.getaddrinfo
+def _ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = _ipv4_getaddrinfo
+
+
+
 import pandas as pd
 import requests
 import yfinance as yf
@@ -97,7 +106,7 @@ def _download_batch(batch, period, min_price, all_data, filtered):
         period=period,
         group_by="ticker",
         auto_adjust=True,
-        threads=True,
+        threads=False,
         progress=False,
     )
 
@@ -127,7 +136,7 @@ def _download_batch(batch, period, min_price, all_data, filtered):
     return new_data, new_filtered
 
 
-def download_data(tickers, period="2y", batch_size=25, min_price=None):
+def download_data(tickers, period="2y", batch_size=10, min_price=None):
     all_data = {}
     failed = []
     filtered = 0
@@ -155,28 +164,6 @@ def download_data(tickers, period="2y", batch_size=25, min_price=None):
             failed.extend(batch)
 
         time.sleep(5.0)
-
-    # Retry pass: failed tickers one at a time with longer sleep
-    if failed:
-        print(f"\n  Retry pass: {len(failed)} failed tickers (one-at-a-time, 5s between)", flush=True)
-        retry_failed = []
-        for i, ticker in enumerate(failed):
-            try:
-                new_data, new_filtered = _download_batch([ticker], period, min_price, all_data, filtered)
-                all_data.update(new_data)
-                filtered += new_filtered
-                if ticker not in all_data:
-                    retry_failed.append(ticker)
-            except Exception:
-                retry_failed.append(ticker)
-
-            if (i + 1) % 50 == 0:
-                print(f"  Retry progress: {i+1}/{len(failed)} ({len(retry_failed)} still failed)", flush=True)
-            time.sleep(5.0)
-
-        failed = retry_failed
-        if failed:
-            print(f"  Final failed count: {len(failed)}", flush=True)
 
     if filtered:
         print(f"  Filtered {filtered} stocks below ${min_price}")
