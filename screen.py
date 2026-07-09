@@ -64,7 +64,7 @@ def main():
 
         if cache:
             data_dict = cache["data"]
-        else:
+        elif args.refresh:
             print("  Fetching ticker list...", flush=True)
             try:
                 tickers = get_tickers(index)
@@ -81,8 +81,12 @@ def main():
             data_dict, failed = download_data(tickers, min_price=min_price)
             print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)", flush=True)
             save_cache(index, tickers, data_dict, failed)
+        else:
+            print(f"  No cached data for {index}. Use --refresh to download.")
+            continue
 
-        data_dict["SPY"] = spy_data
+        if spy_data is not None:
+            data_dict["SPY"] = spy_data
         print("  Running screener...", flush=True)
         results = screen_stocks(data_dict)
 

@@ -359,7 +359,7 @@ def main():
             cache = None if args.refresh else load_cache(index)
             if cache:
                 data_dict = cache["data"]
-            else:
+            elif args.refresh:
                 print("  Downloading...", flush=True)
                 tickers = get_tickers(index)
                 if not tickers:
@@ -368,6 +368,9 @@ def main():
                 data_dict, failed = download_data(tickers, min_price=min_price)
                 print(f"  Downloaded {len(data_dict)} stocks", flush=True)
                 save_cache(index, tickers, data_dict, failed)
+            else:
+                print(f"  No cached data for {index}. Use --refresh to download.")
+                continue
 
             results = get_results(data_dict, min_score=args.min_score)
             if results:

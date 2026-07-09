@@ -174,19 +174,17 @@ SPY_CACHE_FILE = os.path.join(CACHE_DIR, "cache_spy.pkl")
 
 
 def get_benchmark(period="2y", force_refresh=False):
-    """Download SPY data (cached 6h)."""
+    """SPY data. Without --refresh, only uses cache. With --refresh, downloads."""
     if not force_refresh:
         try:
             with open(SPY_CACHE_FILE, "rb") as f:
                 cache = pickle.load(f)
             age = (datetime.now() - cache["timestamp"]).total_seconds() / 3600
-            if age <= 6:
-                print("  Using cached SPY data")
-                return cache["data"]
-            else:
-                print(f"  SPY cache expired ({age:.1f}h), re-downloading...")
+            print(f"  Using cached SPY data from {cache['timestamp'].strftime('%Y-%m-%d %H:%M')} ({age:.1f}h old)")
+            return cache["data"]
         except (FileNotFoundError, Exception):
-            pass
+            print("  No cached SPY data. Use --refresh to download.")
+            return None
 
     print("  Downloading SPY...")
     data = yf.download("SPY", period=period, auto_adjust=True, progress=False)
