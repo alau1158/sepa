@@ -2,6 +2,7 @@
 import argparse
 import os
 import sys
+from datetime import datetime
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -32,7 +33,7 @@ def main():
     parser.add_argument("-all", action="store_true", help="Screen all S&P indices")
     parser.add_argument("--all-us", action="store_true", help="Screen NASDAQ + NYSE (incl. S&P components)")
     parser.add_argument("--no-email", action="store_true", help="Print results to console only")
-    parser.add_argument("--output", type=str, help="Save results to CSV file")
+    parser.add_argument("--output", nargs="?", const="__auto__", help="Save results to CSV (default: sepa_results_YYYY-MM-DD.csv)")
     parser.add_argument("--refresh", action="store_true", help="Force re-download data")
     args = parser.parse_args()
 
@@ -106,9 +107,10 @@ def main():
     if len(all_results) > 1:
         print(f"\n  Combined: {len(combined)} unique stocks")
 
-    if args.output:
-        combined.to_csv(args.output, index=False)
-        print(f"\nResults saved to {args.output}")
+    if args.output is not None:
+        output_path = args.output if args.output != "__auto__" else f"sepa_results_{datetime.now().strftime('%Y-%m-%d')}.csv"
+        combined.to_csv(output_path, index=False)
+        print(f"\nResults saved to {output_path}")
 
     if not args.no_email:
         smtp_user = os.getenv("SMTP_USER")

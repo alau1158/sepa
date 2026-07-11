@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import yfinance as yf
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from minervini.data import get_tickers, download_data, save_cache, load_cache
@@ -202,6 +204,59 @@ def get_results(data_dict, min_score=0):
     return results
 
 
+def fetch_news(ticker, max_days=7):
+    try:
+        t = yf.Ticker(ticker)
+        raw = t.get_news() or []
+    except Exception:
+        return []
+    from datetime import timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_days)
+    filtered = []
+    for item in raw:
+        content = item.get("content", {})
+        pub_date = content.get("pubDate", "")
+        try:
+            pub_time = datetime.fromisoformat(pub_date.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if pub_time < cutoff:
+            continue
+        filtered.append({
+            "title": content.get("title", ""),
+            "publisher": content.get("provider", {}).get("displayName", ""),
+            "link": content.get("canonicalUrl", {}).get("url", ""),
+            "summary": content.get("summary", ""),
+        })
+    return filtered
+
+
+def get_catalyst(ticker, news_items, api_key):
+    from openai import OpenAI
+    if not news_items:
+        return "No recent news found."
+    client = OpenAI(api_key=api_key, base_url="https://opencode.ai/zen/go/v1")
+    lines = []
+    for item in news_items:
+        lines.append(f"  - {item['title']} ({item['publisher']})")
+        if item.get("summary"):
+            lines.append(f"    {item['summary']}")
+    news_text = "\n".join(lines)
+    prompt = f"""You are a financial analyst. Below is recent news for {ticker}.
+
+{news_text}
+
+Based on this news, determine if there is a fundamental catalyst driving the stock's recent momentum. Reply with 1-2 sentences identifying the catalyst (e.g., strong earnings, product launch, sector tailwind). If no clear catalyst is found, say "No clear catalyst identified from recent news." Do not include any preamble."""
+    try:
+        response = client.chat.completions.create(
+            model="mimo-v2.5",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return "AI analysis unavailable."
+
+
 def send_email(results, indices, smtp_config, recipients, top_n=999):
     import csv
     import io
@@ -219,8 +274,10 @@ def send_email(results, indices, smtp_config, recipients, top_n=999):
         stage_style = ""
         if r.get("Stage") == "Fresh": stage_style = ' style="background:#d4edda;font-weight:bold;"'
         elif r.get("Stage") == "Running": stage_style = ' style="background:#fff3cd;font-weight:bold;"'
+        catalyst = r.get("Catalyst", "")
+        tradingview_link = f"https://www.tradingview.com/chart/?symbol={r['Ticker']}"
         rows += f"""<tr>
-<td><a href="https://www.tradingview.com/chart/?symbol={r['Ticker']}">{r['Ticker']}</a></td>
+<td><a href="{tradingview_link}">{r['Ticker']}</a></td>
 <td>${r['Price']}</td>
 <td style="font-weight:bold;">{r['Score']}</td>
 <td>{r['Status']}</td>
@@ -234,6 +291,7 @@ def send_email(results, indices, smtp_config, recipients, top_n=999):
 <td>{r['SMA_Exp']}</td>
 <td>{r['Vol_Ratio']}</td>
 <td>{r['RS_Slope']}</td>
+<td style="font-size:12px;max-width:300px;">{catalyst}</td>
 </tr>"""
 
     html = f"""<html><body style="font-family:Arial,sans-serif;">
@@ -245,7 +303,7 @@ It does not check <em>why</em> they are moving — do your own research before t
 <p>{date_str} | Universe: {index_str} | Passing: {len(results)} stocks</p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
 <tr style="background:#2c3e50;color:white;">
-<th>Ticker</th><th>Price</th><th>Score</th><th>Status</th><th>Stage</th><th>Days</th><th>5d%</th><th>10d%</th><th>20d%</th><th>Accel</th><th>Power</th><th>SMA Exp</th><th>Vol Ratio</th><th>RS Slope</th>
+<th>Ticker</th><th>Price</th><th>Score</th><th>Status</th><th>Stage</th><th>Days</th><th>5d%</th><th>10d%</th><th>20d%</th><th>Accel</th><th>Power</th><th>SMA Exp</th><th>Vol Ratio</th><th>RS Slope</th><th>Catalyst</th>
 </tr>
 {rows}
 </table>
@@ -257,10 +315,12 @@ It does not check <em>why</em> they are moving — do your own research before t
     writer = csv.writer(csv_out)
     cols = ["Ticker", "Price", "Score", "Status", "Stage", "Days",
             "5d%", "10d%", "20d%", "Accel", "Power", "SMA_Exp",
-            "Vol_Ratio", "RS_Slope"]
+            "Vol_Ratio", "RS_Slope", "Catalyst", "TradingView_Link"]
     writer.writerow(cols)
     for r in results[:top_n]:
-        writer.writerow([r.get(c, "") for c in cols])
+        vals = [r.get(c, "") for c in cols[:-1]]
+        vals.append(f"https://www.tradingview.com/chart/?symbol={r['Ticker']}")
+        writer.writerow(vals)
     csv_data = csv_out.getvalue()
 
     # ── Build message ──
@@ -318,6 +378,8 @@ def main():
     parser.add_argument("--min-score", type=int, default=40, help="Minimum score threshold (default: 40)")
     parser.add_argument("--top", type=int, default=0, help="Show only top N results")
     parser.add_argument("--no-email", action="store_true")
+    parser.add_argument("--no-ai", action="store_true", help="Skip AI catalyst analysis")
+    parser.add_argument("--output", nargs="?", const="__auto__", help="Save results to CSV (default: momentum_scan_YYYY-MM-DD.csv)")
     parser.add_argument("--refresh", action="store_true")
     args = parser.parse_args()
 
@@ -395,6 +457,25 @@ def main():
         print("\nNo stocks above threshold.")
         return
 
+    # ── AI catalyst analysis (Fresh & Running only) ──
+    if not args.no_ai:
+        fresh_running = [r for r in all_results if r.get("Stage") in ("Fresh", "Running")]
+        api_key = os.getenv("OPENCODE_GO_API_KEY")
+        if api_key and fresh_running:
+            print(f"\nAnalyzing catalysts for {len(fresh_running)} stocks...")
+            for i, r in enumerate(fresh_running):
+                ticker = r["Ticker"]
+                print(f"  [{i+1}/{len(fresh_running)}] {ticker}...", end=" ", flush=True)
+                news = fetch_news(ticker)
+                if news:
+                    catalyst = get_catalyst(ticker, news, api_key)
+                else:
+                    catalyst = "No recent news found."
+                r["Catalyst"] = catalyst
+                print(catalyst[:80])
+        elif not api_key:
+            print("\nOPENCODE_GO_API_KEY not set. Skipping AI catalyst analysis.")
+
     display = all_results[:args.top] if args.top > 0 else all_results
     df = pd.DataFrame(display)
     print(f"\n{'='*60}")
@@ -402,7 +483,25 @@ def main():
     print(f"{'='*60}")
     pd.set_option("display.max_rows", None)
     pd.set_option("display.width", 200)
-    print(df.to_string(index=False))
+    cols = [c for c in df.columns if c != "Catalyst"]
+    print(df[cols].to_string(index=False))
+
+    if "Catalyst" in df.columns:
+        print(f"\n{'='*60}")
+        print("Catalyst Analysis")
+        print(f"{'='*60}")
+        for r in display:
+            cat = r.get("Catalyst", "")
+            tv = f"https://www.tradingview.com/chart/?symbol={r['Ticker']}"
+            print(f"{r['Ticker']} (Score: {r['Score']}, Stage: {r['Stage']})")
+            print(f"  Catalyst: {cat}")
+            print(f"  TradingView: {tv}")
+            print()
+
+    if args.output is not None:
+        output_path = args.output if args.output != "__auto__" else f"momentum_scan_{datetime.now().strftime('%Y-%m-%d')}.csv"
+        df.to_csv(output_path, index=False)
+        print(f"\nResults saved to {output_path}")
 
     if not args.no_email:
         raw_rcpt = os.getenv("RECIPIENTS", "")
