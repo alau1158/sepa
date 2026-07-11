@@ -108,7 +108,7 @@ def main():
         print(f"\n  Combined: {len(combined)} unique stocks")
 
     if args.output is not None:
-        output_path = args.output if args.output != "__auto__" else f"sepa_results_{datetime.now().strftime('%Y-%m-%d')}.csv"
+        output_path = args.output if args.output != "__auto__" else os.path.expanduser(f"{os.getenv('CSV_OUTPUT_DIR', '~/csv_output')}/sepa_results_{datetime.now().strftime('%Y-%m-%d')}.csv")
         combined.to_csv(output_path, index=False)
         print(f"\nResults saved to {output_path}")
 
