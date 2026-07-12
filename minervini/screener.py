@@ -4,6 +4,7 @@ from . import indicators as ind
 from . import rs_rating as rsr
 from . import vcp as vcp_module
 from . import sell_signals as sell
+from . import pullback as pb
 from . import earnings as earn
 from . import fundamentals as fund
 from .violations import compute_violations
@@ -58,6 +59,8 @@ def screen_stocks(data_dict):
                         "ATR%": atr_val,
                         "VCP_Status": None,
                         "VCP_Score": None,
+                        "Pullback_Status": None,
+                        "Pullback_Score": None,
                         "AD": ad_letter,
                         "EPS_Rating": None,
                         "Ind_Rank": None,
@@ -90,6 +93,10 @@ def screen_stocks(data_dict):
         status, score = vcp_module.detect_vcp(df)
         df_results.at[idx, "VCP_Status"] = status
         df_results.at[idx, "VCP_Score"] = score
+
+        pb_status, pb_score = pb.detect_pullback(df)
+        df_results.at[idx, "Pullback_Status"] = pb_status
+        df_results.at[idx, "Pullback_Score"] = pb_score
 
     earnings_cache = earn.get_earnings_cache(passing_tickers)
     for idx, row in df_results.iterrows():

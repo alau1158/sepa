@@ -20,6 +20,8 @@ def build_html_table(df, indices):
         atr = row.get("ATR%", "")
         vcp_status = row.get("VCP_Status", "")
         vcp_score = row.get("VCP_Score", "")
+        pb_status = row.get("Pullback_Status", "")
+        pb_score = row.get("Pullback_Score", "")
         ad = row.get("AD", "")
         eps = row.get("EPS_Rating", "")
         ind_rank = row.get("Ind_Rank", "")
@@ -43,6 +45,8 @@ def build_html_table(df, indices):
             <td>{atr}%</td>
             <td>{vcp_status}</td>
             <td>{vcp_score}</td>
+            <td>{pb_status}</td>
+            <td>{pb_score}</td>
             <td>{ad}</td>
             <td>{eps}</td>
             <td>{ind_rank}</td>
@@ -67,7 +71,7 @@ def build_html_table(df, indices):
         <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
             <tr style="background: #2c3e50; color: white;">
                 <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>ATR(22)%</th>
-                <th>VCP</th><th>Score</th><th>A/D</th><th>EPS</th><th>Ind Rk</th><th>Next Earnings</th><th>RS</th>
+                <th>VCP</th><th>Score</th><th>Pullback</th><th>PB Sc</th><th>A/D</th><th>EPS</th><th>Ind Rk</th><th>Next Earnings</th><th>RS</th>
                 <th>RS Trend</th><th>RS Div</th><th>Corr Div</th><th>Brk Order</th>
                 <th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>
                 <th>Viol</th><th>V Sc</th>
