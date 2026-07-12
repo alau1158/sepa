@@ -500,7 +500,9 @@ def main():
 
     if args.output is not None:
         output_path = args.output if args.output != "__auto__" else os.path.expanduser(f"{os.getenv('CSV_OUTPUT_DIR', '~/csv_output')}/momentum_scan_{datetime.now().strftime('%Y-%m-%d')}.csv")
-        df.to_csv(output_path, index=False)
+        out = df.copy()
+        out["TradingView_Link"] = "https://www.tradingview.com/chart/?symbol=" + out["Ticker"]
+        out.to_csv(output_path, index=False)
         print(f"\nResults saved to {output_path}")
 
     if not args.no_email:
