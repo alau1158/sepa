@@ -125,7 +125,12 @@ def main():
                 smtp_config = {"user": smtp_user, "password": smtp_pass}
                 print(f"\nSending email to {len(recipients)} recipient(s)...")
                 try:
-                    send_email(combined, indices, smtp_config, recipients)
+                    email_df = combined.sort_values(
+                        by=["AD", "EPS_Rating"],
+                        ascending=[True, False],
+                        na_position="last"
+                    ).reset_index(drop=True)
+                    send_email(email_df, indices, smtp_config, recipients)
                     print("Email sent!")
                 except Exception as e:
                     print(f"Failed to send email: {e}")
