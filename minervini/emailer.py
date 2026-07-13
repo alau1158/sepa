@@ -18,6 +18,8 @@ def build_html_table(df, indices):
         price = row["Price"]
         vs_50 = row.get("vs_50_SMA%", "")
         atr = row.get("ATR%", "")
+        vol_pct = row.get("Vol_vs_50d_Low%", "")
+        vol_flag = row.get("Vol_Low_Flag", "")
         vcp_status = row.get("VCP_Status", "")
         vcp_score = row.get("VCP_Score", "")
         pb_status = row.get("Pullback_Status", "")
@@ -43,6 +45,8 @@ def build_html_table(df, indices):
             <td>{price}</td>
             <td>{vs_50}%</td>
             <td>{atr}%</td>
+            <td>{vol_pct}%</td>
+            <td>{vol_flag}</td>
             <td>{vcp_status}</td>
             <td>{vcp_score}</td>
             <td>{pb_status}</td>
@@ -71,6 +75,7 @@ def build_html_table(df, indices):
         <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
             <tr style="background: #2c3e50; color: white;">
                 <th>Ticker</th><th>Price</th><th>vs 50 SMA%</th><th>ATR(22)%</th>
+                <th>Vol vs 50d Low%</th><th>Vol Low</th>
                 <th>VCP</th><th>Score</th><th>Pullback</th><th>PB Sc</th><th>A/D</th><th>EPS</th><th>Ind Rk</th><th>Next Earnings</th><th>RS</th>
                 <th>RS Trend</th><th>RS Div</th><th>Corr Div</th><th>Brk Order</th>
                 <th>Exh</th><th>Exh Sc</th><th>Dist</th><th>Dist Sc</th>

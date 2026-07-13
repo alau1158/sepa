@@ -37,6 +37,7 @@ def screen_stocks(data_dict):
                 price = round(df["Close"].iloc[-1], 2)
                 vs_50 = ind.price_distance_from_sma(df, 50)
                 atr_val = ind.compute_atr_value(df, 22)
+                vol_pct, vol_flagged = ind.volume_near_50d_low(df)
                 rs_val = rs_ratings.get(ticker, 0)
 
                 ad_letter, ad_score = ind.compute_ad_rating(df)
@@ -57,6 +58,8 @@ def screen_stocks(data_dict):
                         "Price": price,
                         "vs_50_SMA%": round(vs_50, 2) if vs_50 is not None else None,
                         "ATR%": atr_val,
+                        "Vol_vs_50d_Low%": vol_pct,
+                        "Vol_Low_Flag": "Yes" if vol_flagged else "No",
                         "VCP_Status": None,
                         "VCP_Score": None,
                         "Pullback_Status": None,

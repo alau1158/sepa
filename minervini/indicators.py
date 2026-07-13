@@ -74,6 +74,19 @@ def compute_atr_value(df, period=22):
     return round(pct, 2)
 
 
+def volume_near_50d_low(df, threshold_pct=10):
+    vol = df["Volume"]
+    if len(vol) < 50:
+        return None, False
+    low_50d = vol.rolling(50).min()
+    current_low = low_50d.iloc[-1]
+    current_vol = vol.iloc[-1]
+    if current_low == 0:
+        return None, False
+    pct_above = round((current_vol - current_low) / current_low * 100, 1)
+    return pct_above, pct_above <= threshold_pct
+
+
 def compute_rs_line(stock_close, benchmark_close):
     """Return RS line series (stock / benchmark ratio)."""
     rs = stock_close / benchmark_close
