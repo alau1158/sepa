@@ -44,6 +44,8 @@ def compute_score(df):
         comp1 += 8
         if ret_5d > avg_move_10d * 1.5:
             comp1 += 5
+    elif ret_5d > 3:
+        comp1 += 3
     comp1 = min(25, comp1)
     score += comp1
     components["accel"] = comp1
