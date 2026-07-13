@@ -35,6 +35,18 @@ def compute_score(df):
     ret_5d = (close.iloc[-1] / close.iloc[-6] - 1) * 100 if len(close) >= 6 else 0
     daily_chg = close.pct_change(fill_method=None) * 100
     avg_move_10d = daily_chg.iloc[-11:-1].abs().mean() if len(daily_chg) >= 11 else 1
+    
+    # Track old score for logging (before 3% threshold)
+    old_comp1 = 0
+    if ret_5d > 10:
+        old_comp1 += 15
+        if ret_5d > avg_move_10d * 2:
+            old_comp1 += 10
+    elif ret_5d > 5:
+        old_comp1 += 8
+        if ret_5d > avg_move_10d * 1.5:
+            old_comp1 += 5
+    
     comp1 = 0
     if ret_5d > 10:
         comp1 += 15
@@ -49,6 +61,8 @@ def compute_score(df):
     comp1 = min(25, comp1)
     score += comp1
     components["accel"] = comp1
+    components["accel_old"] = old_comp1  # Track for logging
+    components["ret_5d"] = ret_5d  # Track 5d return for logging
 
     # ── 2. Power Days (20 pts) ─────────────────────────────────────
     power = 0
@@ -201,6 +215,12 @@ def get_results(data_dict, min_score=0):
             "Vol_Ratio": comps.get("vol_ratio", 0),
             "RS_Slope": comps.get("rs_slope", 0),
         })
+        
+        # Log stocks that benefited from the new 3% threshold
+        accel_new = comps.get("accel", 0)
+        accel_old = comps.get("accel_old", 0)
+        if accel_new > accel_old:
+            print(f"  ⚡ {ticker}: benefited from new threshold (accel: {accel_old} → {accel_new}, 5d%: {ret_5d:.1f}%)")
 
     results.sort(key=lambda r: r["Score"], reverse=True)
     return results
