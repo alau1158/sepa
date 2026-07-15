@@ -256,7 +256,7 @@ SHEET_ID=your_sheet_id_here    # from the URL: /d/THIS_IS_THE_ID/edit
 | e      | buy    | AAPL   | 20       | 20260318 | 252.62 |
 | e      | sell   | AAPL   | 20       | 20260401 | 255.43 |
 
-- **broker**: `e` (Etrade), `f` (Fidelity), `r` (Robinhood)
+- **broker**: `e` (Etrade), `f` (Fidelity), `r` (Robinhood), `i` (Interactive Broker)
 - **action**: `buy` or `sell`
 - **date**: `YYYYMMDD` format (e.g. `20260527`)
 - **ticket/quantity/price**: plain numbers

@@ -294,7 +294,7 @@ def build_html_report(open_results, closed_trades, es_data=None):
     total_color = text_color(total_pnl_dollar)
 
     # ── Closed Trades Table ──
-    retirement = [t for t in closed_trades if t.get("broker", "").strip().lower() == "f"]
+    retirement = [t for t in closed_trades if t.get("broker", "").strip().lower() in ("f", "i")]
     daytrade = [t for t in closed_trades if t.get("broker", "").strip().lower() in ("e", "r")]
 
     def closed_rows(trades):
@@ -358,7 +358,7 @@ td {{ padding:8px; border:1px solid #ddd; }}
 {open_rows}
 </table>
 
-<h3>Closed Trades — Retirement (Fidelity)</h3>
+<h3>Closed Trades — Retirement (Fidelity / Interactive Broker)</h3>
 <table>
 <tr><th>Ticker</th><th>Qty</th><th>Buy</th><th>Sell</th><th>Sold</th><th>Held</th><th>P&amp;L</th></tr>
 {ret_rows if ret_rows else "<tr><td colspan='7'>No closed trades</td></tr>"}

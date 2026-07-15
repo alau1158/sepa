@@ -1,5 +1,5 @@
 broker,action,ticket,quantity,date,price
-# broker: e=Etrade, r=Robinhhod, f=Fidelity
+# broker: e=Etrade, r=Robinhhod, f=Fidelity, i=Interactive Broker
 # action: buy or sell
 # ticket: stock symbol
 # quantity: number of shares
