@@ -27,6 +27,8 @@ def compute_weighted_return(df):
 def compute_rs_ratings(data_dict):
     returns = {}
     for ticker, df in data_dict.items():
+        if ticker == "SPY":
+            continue
         ret = compute_weighted_return(df)
         if ret is not None and not pd.isna(ret):
             returns[ticker] = ret

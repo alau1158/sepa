@@ -18,7 +18,9 @@ def screen_stocks(data_dict):
 
     results = []
     for ticker, df in data_dict.items():
-        if len(df) < 200:  # 200-day SMA needs ~200 days; was 250 (overly strict)
+        if ticker == "SPY":
+            continue
+        if len(df) < 252:  # 52-week lookback (252 trading days) needed for RS rating & 52w range
             continue
 
         try:

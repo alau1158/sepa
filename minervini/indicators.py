@@ -90,6 +90,8 @@ def volume_near_50d_low(df, threshold_pct=10):
 def compute_rs_line(stock_close, benchmark_close):
     """Return RS line series (stock / benchmark ratio)."""
     rs = stock_close / benchmark_close
+    stock_close = stock_close.reindex(benchmark_close.index)
+    rs = stock_close / benchmark_close
     return rs
 
 
@@ -155,15 +157,17 @@ def find_market_corrections(price_series, min_decline=5):
             peak_idx = i
         decline = (peak_val - prices[i]) / peak_val * 100
         if decline >= min_decline:
+            # Find the actual trough (lowest price) after the peak
             trough_idx = i
             trough_val = prices[i]
             for j in range(i + 1, n):
-                if prices[j] > trough_val:
+                if prices[j] < trough_val:
                     trough_val = prices[j]
                     trough_idx = j
-                    recovery = (prices[j] - prices[i]) / prices[i] * 100
-                    if recovery >= decline * 0.5:
-                        break
+                # Check if recovery from the lowest point reaches half the decline
+                recovery = (prices[j] - trough_val) / trough_val * 100
+                if recovery >= decline * 0.5:
+                    break
             corrections.append({
                 "peak_idx": peak_idx,
                 "peak_val": peak_val,
@@ -187,14 +191,18 @@ def check_correction_divergence(stock_df, spy_df, min_decline=5):
     if not spy_corrections:
         return "Neutral"
 
+    # Reindex stock data onto SPY's date index so positional indices align
+    stock_low = stock_df["Low"].reindex(spy_df.index)
+    stock_close = stock_df["Close"].reindex(spy_df.index)
+
     stock_lows = []
     for corr in spy_corrections:
         pk, tr = corr["peak_idx"], corr["trough_idx"]
-        if pk >= len(stock_df) or tr >= len(stock_df):
+        if pk >= len(stock_low) or tr >= len(stock_low):
             continue
-        stock_peak = stock_df["Low"].iloc[pk:tr + 1].min()
-        stock_before = stock_df["Low"].iloc[max(0, pk - 20):pk + 1].min()
-        if stock_before > 0:
+        stock_peak = stock_low.iloc[pk:tr + 1].min()
+        stock_before = stock_low.iloc[max(0, pk - 20):pk + 1].min()
+        if stock_before > 0 and not pd.isna(stock_before) and not pd.isna(stock_peak):
             stock_lows.append(stock_peak > stock_before)
 
     if not stock_lows:

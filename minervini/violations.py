@@ -25,7 +25,7 @@ def compute_violations(df, entry_price=None):
     sma_50 = close.rolling(50).mean()
 
     if len(df) < 50:
-        return 0, 0, "Clean"
+        return 0, 0, "Clean", ""
 
     score = 0
     reasons = []

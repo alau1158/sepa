@@ -30,22 +30,22 @@ def detect_pullback(df):
     vol_50d = vol.rolling(50).mean()
 
     # ── Phase 1: Basic checks ─────────────────────────────────────
-    if any(pd.isna(sma20.iloc[-1]) for s in [sma20, sma50, sma150, sma200]):
+    if any(pd.isna(s.iloc[-1]) for s in [sma20, sma50, sma150, sma200]):
         return "No Pullback", 0
 
     # Must be in uptrend (above all key MAs)
     c = close.iloc[-1]
-    if not (c > sma20.iloc[-1] and c > sma50.iloc[-1]
-            and c > sma150.iloc[-1] and c > sma200.iloc[-1]):
+    if not (c >= sma20.iloc[-1] and c >= sma50.iloc[-1]
+            and c >= sma150.iloc[-1] and c >= sma200.iloc[-1]):
         return "No Pullback", 0
 
-    # Must have had a meaningful run-up (price >= 5% above SMA50)
-    pct_above_50 = (c - sma50.iloc[-1]) / sma50.iloc[-1] * 100
+    # Must have had a meaningful run-up (peak price >= 5% above SMA50)
+    high_20d = high.iloc[-20:].max()
+    pct_above_50 = (high_20d - sma50.iloc[-1]) / sma50.iloc[-1] * 100
     if pct_above_50 < 5:
         return "No Pullback", 0
 
     # ── Phase 2: Pullback measurement ─────────────────────────────
-    high_20d = high.iloc[-20:].max()
     dist_from_high = (high_20d - c) / high_20d * 100
 
     # Must be pulling back (3-12% off recent high)
