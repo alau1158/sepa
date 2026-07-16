@@ -45,7 +45,7 @@ def compute_atr(df, period=22):
 
 def above_52w_low_pct(df, lookback=WEEK_LOOKBACK):
     if len(df) < lookback:
-        return None
+        return 0.0
     current = df["Close"].iloc[-1]
     low_52w = df["Close"].iloc[-lookback:].min()
     return ((current - low_52w) / low_52w) * 100
@@ -53,7 +53,7 @@ def above_52w_low_pct(df, lookback=WEEK_LOOKBACK):
 
 def within_52w_high_pct(df, lookback=WEEK_LOOKBACK):
     if len(df) < lookback:
-        return None
+        return 100.0
     current = df["Close"].iloc[-1]
     high_52w = df["Close"].iloc[-lookback:].max()
     return ((high_52w - current) / high_52w) * 100

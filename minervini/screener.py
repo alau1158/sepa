@@ -1,4 +1,6 @@
 import pandas as pd
+import sys
+import traceback
 
 from . import indicators as ind
 from . import rs_rating as rsr
@@ -84,6 +86,7 @@ def screen_stocks(data_dict):
                     }
                 )
         except Exception:
+            print(f"  [WARN] {ticker}: {traceback.format_exc().splitlines()[-1]}", file=sys.stderr)
             continue
 
     if not results:
@@ -141,7 +144,7 @@ def screen_stocks(data_dict):
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]
         df = data_dict[ticker]
-        ex_score, ex_status = sell.compute_exhaustion_score(df, ticker=ticker)
+        ex_score, ex_status = sell.compute_exhaustion_score(df)
         di_score, di_status = sell.compute_distribution_score(df)
         # 8 Minervini post-purchase violation checks. Useful pre-purchase too —
         # flags stocks already showing distribution / 20-SMA breach signals

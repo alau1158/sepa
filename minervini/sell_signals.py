@@ -5,7 +5,7 @@ def _pct_chg(a, b):
     return (a - b) / b * 100
 
 
-def compute_exhaustion_score(df, ticker=None):
+def compute_exhaustion_score(df, pe_ratio=None):
     """Exhaustion / climax-run detection (0–100). Higher = more overextended."""
     close = df["Close"]
     high = df["High"]
@@ -59,7 +59,7 @@ def compute_exhaustion_score(df, ticker=None):
     if len(trailing_65) >= 15:
         max_spread = trailing_65.max()
         recent_max = trailing_65.iloc[-15:].max()
-        if recent_max == max_spread and max_spread > 0:
+        if recent_max >= max_spread and max_spread > 0:
             avg_range = trailing_65.mean()
             ratio = recent_max / avg_range if avg_range > 0 else 1
             if ratio >= 3:
@@ -101,28 +101,16 @@ def compute_exhaustion_score(df, ticker=None):
         score += 3
 
     # ── 6. P/E Expansion (10 pts) ─────────────────────────────
-    # Note: requires a ticker argument. The screener passes one. Callers that
-    # don't have a ticker (older portfolio_report code) will simply skip this
-    # component — the 10 pts are not allocated rather than miscounted.
-    info = None
-    if ticker:
-        try:
-            from yfinance import Ticker
-            info = Ticker(ticker).info
-        except Exception:
-            info = None
-    try:
-        if info and "trailingPE" in info:
-            pe_now = info["trailingPE"]
-            if pe_now and pe_now > 0:
-                start_close = close.iloc[-130] if len(close) >= 130 else close.iloc[0]
-                pe_start_est = pe_now * (start_close / close.iloc[-1])
-                if pe_start_est > 0 and pe_now / pe_start_est >= 2:
-                    score += 10
-                elif pe_start_est > 0 and pe_now / pe_start_est >= 1.5:
-                    score += 5
-    except (TypeError, KeyError):
-        pass
+    # Requires a pre-fetched trailingPE to avoid live API calls during
+    # screening. Callers can pass pe_ratio=<value> if available; otherwise
+    # this component is skipped (10 pts not allocated).
+    if pe_ratio and pe_ratio > 0:
+        start_close = close.iloc[-130] if len(close) >= 130 else close.iloc[0]
+        pe_start_est = pe_ratio * (start_close / close.iloc[-1])
+        if pe_start_est > 0 and pe_ratio / pe_start_est >= 2:
+            score += 10
+        elif pe_start_est > 0 and pe_ratio / pe_start_est >= 1.5:
+            score += 5
 
     score = min(100, max(0, score))
 
