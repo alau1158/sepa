@@ -126,11 +126,17 @@ def detect_vcp(df):
     Validates the halving rule, final tightness, volume vacuum, and
     hard-filters stocks that have already broken out.
 
-    Returns (status: str, score: int).
+    Returns (status: str, score: int, meta: dict).
     Status: "VCP Tight", "VCP Forming", "No VCP", "Already Broken Out"
+    Meta: {"resistance_level": float|None, "dist_to_pivot_pct": float|None}
+        - resistance_level: the pivot ceiling price (None if undetermined)
+        - dist_to_pivot_pct: how far current price is from resistance
+          (negative = above pivot, positive = below, None if undetermined)
     """
+    _no_meta = {"resistance_level": None, "dist_to_pivot_pct": None}
+
     if len(df) < 130:
-        return "No VCP", 0
+        return "No VCP", 0, _no_meta
 
     close = df["Close"]
     vol = df["Volume"]
@@ -145,7 +151,7 @@ def detect_vcp(df):
     min_base_days = 25
     cutoff = len(seg) - min_base_days
     if cutoff < 20:
-        return "No VCP", 0
+        return "No VCP", 0, _no_meta
 
     # Find the highest high in the first portion — this defines resistance.
     # Then find the FIRST time price reached near that level — this marks
@@ -170,18 +176,19 @@ def detect_vcp(df):
 
     T = len(contractions)
     if T < 2:
-        return "No VCP", 0
+        return "No VCP", 0, _no_meta
 
     # ── Phase 3: Hard Filters ──────────────────────────────────────────
+    _meta = {"resistance_level": round(resistance_level, 2), "dist_to_pivot_pct": round(((resistance_level - current_close) / resistance_level) * 100, 2)}
     if current_close > resistance_level * 1.02:
-        return "Already Broken Out", 0
+        return "Already Broken Out", 0, _meta
 
     if current_close < resistance_level * 0.90:
-        return "No VCP", 0
+        return "No VCP", 0, _meta
 
     first_depth = contractions[0]["depth"]
     if first_depth < 10 or first_depth > 50:
-        return "No VCP", 0
+        return "No VCP", 0, _meta
 
     # ── Phase 4: Scoring ───────────────────────────────────────────────
     score = 0
@@ -292,4 +299,4 @@ def detect_vcp(df):
     else:
         status = "No VCP"
 
-    return status, score
+    return status, score, _meta

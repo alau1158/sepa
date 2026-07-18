@@ -66,6 +66,7 @@ def screen_stocks(data_dict):
                         "Vol_Low_Flag": "Yes" if vol_flagged else "No",
                         "VCP_Status": None,
                         "VCP_Score": None,
+                        "Dist_to_Pivot%": None,
                         "Pullback_Status": None,
                         "Pullback_Score": None,
                         "AD": ad_letter,
@@ -98,9 +99,10 @@ def screen_stocks(data_dict):
     for idx, row in df_results.iterrows():
         ticker = row["Ticker"]
         df = data_dict[ticker]
-        status, score = vcp_module.detect_vcp(df)
+        status, score, meta = vcp_module.detect_vcp(df)
         df_results.at[idx, "VCP_Status"] = status
         df_results.at[idx, "VCP_Score"] = score
+        df_results.at[idx, "Dist_to_Pivot%"] = meta.get("dist_to_pivot_pct")
 
         pb_status, pb_score = pb.detect_pullback(df)
         df_results.at[idx, "Pullback_Status"] = pb_status
