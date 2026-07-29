@@ -197,16 +197,21 @@ def detect_vcp(df):
     if first_depth < 10 or first_depth > 50:
         return "No VCP", 0, _meta
 
-    # ── Phase 4: Scoring (100 pts) ─────────────────────────────────────
-    # Weights derived from 10-year backtest (341K observations, Jul 2026)
+    # ── Phase 4: Scoring (v4.0 — July 28 2026 refactor) ────────────────
+    # Weights from 10-year backtest (341K obs) + v2 deep investigation
+    #   v4.0 changes:
+    #     - Base duration: REMOVED (zero correlation)
+    #     - Halving rule: REPLACED by contraction ratio (15 pts)
+    #     - Near resistance: NEW 10 pt component (3.6x multiplier)
+    #     - Compression volatility: NEW 5 pt (coiled spring)
+    #     - Price tier $200+: NEW 3 pt (institutional quality)
+    #     - Score cap at 85 (returns turn negative at >=90)
+    #     - Distance to pivot weight increased to 20 pts
     score = 0
-    base_duration = len(seg) - 1 - resistance_idx
+    base_duration = len(seg) - 1 - resistance_idx  # kept for meta, not scored
 
     # ============================================================
-    # 4a) Stage 2 MA Stacking Check (10 pts) — NEW
-    # ------------------------------------------------------------
-    # Backtest: VCP + full Stage 2 tends to outperform VCP alone.
-    # Checks the core MA alignment criteria from OHLCV data alone.
+    # 4a) Stage 2 MA Stacking Check (10 pts) — unchanged
     # ============================================================
     mav20 = close.rolling(20).mean()
     mav50 = close.rolling(50).mean()
@@ -214,78 +219,57 @@ def detect_vcp(df):
     mav200 = close.rolling(200).mean()
 
     s2_score = 0
-    # C1: Price > 150MA AND > 200MA
     if not pd.isna(mav150.iloc[-1]) and not pd.isna(mav200.iloc[-1]):
         if current_close > mav150.iloc[-1] and current_close > mav200.iloc[-1]:
             s2_score += 2
-    # C2: 150MA > 200MA
     if not pd.isna(mav150.iloc[-1]) and not pd.isna(mav200.iloc[-1]):
         if mav150.iloc[-1] > mav200.iloc[-1]:
             s2_score += 2
-    # C3: 200MA trending up (today > 20 days ago)
     if not pd.isna(mav200.iloc[-1]) and not pd.isna(mav200.iloc[-21]):
         if mav200.iloc[-1] > mav200.iloc[-21]:
             s2_score += 2
-    # C4: 50MA > 150MA > 200MA
     if not pd.isna(mav50.iloc[-1]) and not pd.isna(mav150.iloc[-1]) and not pd.isna(mav200.iloc[-1]):
         if mav50.iloc[-1] > mav150.iloc[-1] and mav150.iloc[-1] > mav200.iloc[-1]:
             s2_score += 2
-    # C5: Price > 50MA
     if not pd.isna(mav50.iloc[-1]):
         if current_close > mav50.iloc[-1]:
             s2_score += 2
-    # Cap at 10
     score += min(10, s2_score)
 
     # ============================================================
-    # 4b) Base Duration (5 pts, down from 10)
-    # ------------------------------------------------------------
-    # Backtest: near-zero correlation with forward returns.
-    # Keep for structural completeness, minimal weight.
+    # 4b) Base Duration — REMOVED (v4.0, r=+0.001)
     # ============================================================
-    if 35 <= base_duration <= 150:    # 7-30 weeks (sweet spot)
-        score += 5
-    elif 25 <= base_duration <= 250:  # 5-50 weeks (acceptable)
-        score += 2
 
     # ============================================================
-    # 4c) Contraction Count (10 pts — cap reward at 3)
-    # ------------------------------------------------------------
-    # Backtest: 2-3 contractions have best breakout rates.
-    # 4+ gets stale. Don't reward 5+.
+    # 4c) Contraction Count (5 pts, down from 10)
     # ============================================================
     if 2 <= T <= 3:
-        score += 10
-    elif T == 4:
         score += 5
+    elif T == 4:
+        score += 3
     elif T >= 5:
-        score += 2
+        score += 1
 
     # ============================================================
-    # 4d) Halving Rule (5 pts, down from 25)
-    # ------------------------------------------------------------
-    # Backtest: essentially no predictive power. Stocks with zero
-    # halving break out MORE than perfectly-halving ones.
-    # Kept as a minor check for pattern aesthetics, not signal.
-    # ============================================================
-    halving_passes = 0
-    halving_total = 0
-    for i in range(1, T):
-        halving_total += 1
-        if contractions[i]["depth"] <= contractions[i - 1]["depth"] * 0.60:
-            halving_passes += 1
-
-    if halving_total > 0:
-        score += int(5 * halving_passes / halving_total)
-
-    # ============================================================
-    # 4e) Final Tightness (25 pts — BEST SIGNAL, keep as-is)
-    # ------------------------------------------------------------
-    # Backtest: final depth <=3% gives 80.3% breakout rate. 
-    # Strongest single predictor. Unchanged from original.
+    # 4d) Contraction Ratio (15 pts) — NEW v4.0, replaces halving
+    # Backtest v2: first_depth/final_depth >=6x = 41% breakout
     # ============================================================
     final_depth = contractions[-1]["depth"]
+    first_depth = contractions[0]["depth"]
+    contraction_ratio = first_depth / final_depth if final_depth > 0 else 0
 
+    if contraction_ratio >= 10:
+        score += 15
+    elif contraction_ratio >= 6:
+        score += 12
+    elif contraction_ratio >= 4:
+        score += 9
+    elif contraction_ratio >= 2:
+        score += 4
+
+    # ============================================================
+    # 4e) Final Tightness (15 pts + 5 pts close = 20 pts total)
+    # ============================================================
     if final_depth <= 3:
         score += 15
     elif final_depth <= 5:
@@ -297,101 +281,100 @@ def detect_vcp(df):
 
     last_n = min(10, len(seg))
     recent_closes = seg["Close"].iloc[-last_n:]
+    close_std_pct = 0
     if recent_closes.mean() > 0:
         close_std_pct = recent_closes.std() / recent_closes.mean() * 100
         if close_std_pct <= 1.0:
-            score += 10
+            score += 5
         elif close_std_pct <= 2.0:
-            score += 7
-        elif close_std_pct <= 3.0:
             score += 3
+        elif close_std_pct <= 3.0:
+            score += 1
 
     # ============================================================
-    # 4f) Volume (10 pts, down from 15 — gate removed)
-    # ------------------------------------------------------------
-    # Backtest: volume dry-up is INVERTED — higher vol ratio 
-    # correlates with HIGHER breakout rates. Very low volume 
-    # (<0.5x avg) = dead stock, not coiled spring.
-    # Removed the "vol at p10" bonus and down-vol check entirely.
-    # Now just uses vol ratio as a soft signal favoring normal
-    # or slightly elevated volume.
+    # 4f) Volume (5 pts — soft signal only)
     # ============================================================
     vol_avg = float(vol_50d.iloc[-1]) if not pd.isna(vol_50d.iloc[-1]) else 0
     recent_vol_5d = float(seg["Volume"].iloc[-5:].mean())
     if vol_avg > 0:
         vol_ratio = recent_vol_5d / vol_avg
-        # Sweet spot: 0.5-1.5x average volume. Dead (<0.5) gets no pts.
-        # Very high (>1.5) might already be breaking out.
         if 0.5 <= vol_ratio <= 1.5:
-            score += 8
+            score += 5
         elif vol_ratio < 0.5:
-            score += 2   # Dead volume — minimal pts
-        else:  # > 1.5
-            score += 5   # Loud — possible breakout in progress, partial credit
+            score += 1
+        else:
+            score += 3
 
     # ============================================================
-    # 4g) Price Position Near Pivot (15 pts, up from 10)
-    # ------------------------------------------------------------
-    # Backtest: stocks within 2% of pivot have 38.3% 10d breakout 
-    # vs 8.6% for 5-10% away. Strongest timing signal.
+    # 4g) Price Position Near Pivot (20 pts — HARD GATE weight)
+    # Backtest v2: cliff at 2%. 49% -> 25% breakout.
     # ============================================================
     price_pct_below = (resistance_level - current_close) / resistance_level * 100
     if price_pct_below <= 2:
-        score += 15
+        score += 20
     elif price_pct_below <= 5:
-        score += 10
+        score += 12
     elif price_pct_below <= 7:
         score += 6
     elif price_pct_below <= 10:
         score += 3
 
-    # Pivot Proximity Bonus (5 pts) — keep
+    # ============================================================
+    # 4h) Near Resistance Flag (10 pts) — NEW v4.0
+    # Backtest v2: 43.3% vs 12.1% breakout (3.6x multiplier).
+    # ============================================================
     last_low = contractions[-1]["low_price"]
     above_last_low = current_close > last_low
     near_resistance = current_close >= resistance_level * 0.97
-    if above_last_low and near_resistance:
-        score += 5
+    if near_resistance:
+        score += 10
 
     # ============================================================
-    # 4h) 50MA Distance Check — Extended Penalty (10 pts) — NEW
-    # ------------------------------------------------------------
-    # Backtest: win rate drops below 50% at >10% above 50MA.
-    # For VCP stocks specifically, >+5% above 50MA hurts returns.
-    # Penalty scales: bonus at 0-5%, neutral at 5-10%, penalize >10%.
+    # 4i) 50MA Distance Check (10 pts) — unchanged
     # ============================================================
     if not pd.isna(mav50.iloc[-1]):
         vs_50ma = (current_close - mav50.iloc[-1]) / mav50.iloc[-1] * 100
         if 0 <= vs_50ma <= 5:
-            score += 10    # Sweet spot — near 50MA but above it
+            score += 10
         elif -5 <= vs_50ma < 0:
-            score += 6     # Slightly below — still OK
+            score += 6
         elif 5 < vs_50ma <= 10:
-            score += 4     # Getting extended, reduced points
+            score += 4
         elif vs_50ma > 10:
-            score += 0     # Extended — no points (could be negative, but score is capped at 0)
-            # Note: for analysis, flag vs_50ma in meta
-        else:  # vs_50ma < -5
-            score += 2     # Deep below 50MA — not ideal for VCP
+            score += 0
+        else:
+            score += 2
 
     # ============================================================
-    # 4i) Run-up from 52w Low — Late Stage Awareness (5 pts) — NEW
-    # ------------------------------------------------------------
-    # Backtest: stocks with 200-400% run-up from 52w low have BEST 
-    # forward returns. "Late stage = dangerous" is backwards.
-    # Reward strong run-up, penalize very low run-up (weak stock).
+    # 4j) Run-up from 52w Low (5 pts) — unchanged
     # ============================================================
     lookback_full = min(252, len(df))
     low_52w = float(close.iloc[-lookback_full:].min())
     if low_52w > 0:
         runup_pct = (current_close - low_52w) / low_52w * 100
         if runup_pct >= 100:
-            score += 5     # Strong prior run — leader
+            score += 5
         elif runup_pct >= 50:
-            score += 3     # Moderate run
-        # <50% = weak run-up, no points (stock hasn't proven itself)
+            score += 3
+
+    # ============================================================
+    # 4k) Compression Volatility (5 pts) — NEW v4.0
+    # Backtest v2: close_std >2% + depth <=5% = coiled spring.
+    # ============================================================
+    if close_std_pct > 2.0 and final_depth <= 5:
+        score += 5
+    elif close_std_pct > 1.0 and final_depth <= 3:
+        score += 3
+
+    # ============================================================
+    # 4l) Price Tier Bonus (3 pts) — NEW v4.0
+    # ============================================================
+    if current_close >= 200:
+        score += 3
 
     # ── Phase 5: Classification ───────────────────────────────────────
-    score = int(min(100, max(0, score)))
+    # v4.0: Cap at 85 — returns turn negative at >=90
+    score = int(min(85, max(0, score)))
 
     if score >= 60:
         status = "VCP Tight"
@@ -400,4 +383,5 @@ def detect_vcp(df):
     else:
         status = "No VCP"
 
+    _meta["contraction_ratio"] = round(contraction_ratio, 2)
     return status, score, _meta
