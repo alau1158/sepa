@@ -186,8 +186,19 @@ def detect_vcp(df):
         return "No VCP", 0, _no_meta
 
     # ── Phase 3: Hard Filters ──────────────────────────────────────────
-    _meta = {"resistance_level": round(resistance_level, 2), "dist_to_pivot_pct": round(((resistance_level - current_close) / resistance_level) * 100, 2)}
-    if current_close > resistance_level * 1.02:
+    # Corrected pivot: resistance_level excludes the last 25 days so a clean
+    # base can form, but when a stock tagged its 52-week high inside those
+    # excluded days and is now consolidating beneath it, resistance_level
+    # sits below current_close and would yield a negative dist_to_pivot_pct
+    # — mislabeling a pre-breakout name as above pivot. The true pivot is the
+    # actual ceiling: the highest high across the full 52-week window (which
+    # includes the excluded base-formation days). Only override when the
+    # base-window level is below current close; otherwise keep it as-is.
+    high_52w = float(high.iloc[-min(252, len(df)):].max())
+    pivot_level = max(resistance_level, high_52w) if resistance_level < current_close else resistance_level
+
+    _meta = {"resistance_level": round(pivot_level, 2), "dist_to_pivot_pct": round(((pivot_level - current_close) / pivot_level) * 100, 2)}
+    if current_close > pivot_level * 1.02:
         return "Already Broken Out", 0, _meta
 
     if current_close < resistance_level * 0.90:
@@ -309,7 +320,7 @@ def detect_vcp(df):
     # 4g) Price Position Near Pivot (20 pts — HARD GATE weight)
     # Backtest v2: cliff at 2%. 49% -> 25% breakout.
     # ============================================================
-    price_pct_below = (resistance_level - current_close) / resistance_level * 100
+    price_pct_below = (pivot_level - current_close) / pivot_level * 100
     if price_pct_below <= 2:
         score += 20
     elif price_pct_below <= 5:
