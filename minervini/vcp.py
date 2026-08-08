@@ -191,11 +191,19 @@ def detect_vcp(df):
     # excluded days and is now consolidating beneath it, resistance_level
     # sits below current_close and would yield a negative dist_to_pivot_pct
     # — mislabeling a pre-breakout name as above pivot. The true pivot is the
-    # actual ceiling: the highest high across the full 52-week window (which
-    # includes the excluded base-formation days). Only override when the
-    # base-window level is below current close; otherwise keep it as-is.
-    high_52w = float(high.iloc[-min(252, len(df)):].max())
-    pivot_level = max(resistance_level, high_52w) if resistance_level < current_close else resistance_level
+    # actual ceiling: the highest high across the prior 52-week window
+    # (which includes the excluded base-formation days). Only override when
+    # the base-window level is below current close; otherwise keep it as-is.
+    # NOTE: today's bar is deliberately EXCLUDED from the 52-week high. Since
+    # today's High >= today's Close, including it would force pivot_level >=
+    # current_close, making dist_to_pivot_pct never negative and the "Already
+    # Broken Out" status (close > pivot_level * 1.02) unreachable by
+    # construction. Using the PRIOR 52-week high preserves the sign
+    # semantics so genuine breakouts (close extended above the prior ceiling)
+    # stay detectable while pre-breakout names (close beneath the prior
+    # ceiling) still report a positive distance.
+    high_52w_prev = float(high.iloc[-min(252, len(df)):-1].max())
+    pivot_level = max(resistance_level, high_52w_prev) if resistance_level < current_close else resistance_level
 
     _meta = {"resistance_level": round(pivot_level, 2), "dist_to_pivot_pct": round(((pivot_level - current_close) / pivot_level) * 100, 2)}
     if current_close > pivot_level * 1.02:
