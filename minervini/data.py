@@ -106,7 +106,7 @@ def _download_batch(batch, period, min_price, all_data, filtered):
         period=period,
         group_by="ticker",
         auto_adjust=True,
-        threads=False,
+        threads=True,
         progress=False,
     )
 
@@ -136,16 +136,21 @@ def _download_batch(batch, period, min_price, all_data, filtered):
     return new_data, new_filtered
 
 
-def download_data(tickers, period="2y", batch_size=10, min_price=None):
+def download_data(tickers, period="2y", batch_size=50, min_price=None):
     all_data = {}
     failed = []
     filtered = 0
     total_batches = (len(tickers) + batch_size - 1) // batch_size
 
-    # Main pass: smaller batches with generous sleep
+    consecutive_failures = 0
+
+    # Main pass: moderate batches, threads=True, conditional backoff.
+    # No blind sleep between successful batches — only pause + retry when
+    # Yahoo throttles (HTTP 429 / empty result), then back off harder.
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i : i + batch_size]
         batch_num = (i // batch_size) + 1
+
         try:
             new_data, new_filtered = _download_batch(batch, period, min_price, all_data, filtered)
             all_data.update(new_data)
@@ -158,12 +163,21 @@ def download_data(tickers, period="2y", batch_size=10, min_price=None):
                 if t not in succeeded:
                     failed.append(t)
 
+            if new_data:
+                consecutive_failures = 0
+
             if batch_num % 20 == 0 or batch_num == total_batches:
                 print(f"  Progress: {batch_num}/{total_batches} batches ({len(all_data)} stocks loaded, {len(failed)} failed)", flush=True)
         except Exception:
             failed.extend(batch)
+            consecutive_failures += 1
 
-        time.sleep(5.0)
+        # Conditional rate-limit backoff: nothing when healthy, brief pause
+        # after a throttled batch, longer cooldown if Yahoo keeps refusing.
+        if consecutive_failures > 2:
+            time.sleep(30.0)
+        elif consecutive_failures > 0:
+            time.sleep(2.0)
 
     if filtered:
         print(f"  Filtered {filtered} stocks below ${min_price}")
