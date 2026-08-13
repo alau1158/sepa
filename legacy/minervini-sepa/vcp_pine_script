@@ -1,0 +1,66 @@
+//got the source from https://www.tradingview.com/script/filyLJ1l-VCP-Pattern-with-Pocket-Pivots-by-Mark-Minervini/
+//@version=5
+indicator("VCP Pattern with Pocket Pivots by Mark Minervini", overlay=true)
+
+// --- Inputs ---
+lookbackPeriod = input.int(20, "Lookback Period for VCP", minval=10) // Period to analyze contractions
+pivotRangeBars = input.int(5, "Pivot Range Bars", minval=3) // Bars to define the pivot range
+volumeBreakoutMultiplier = input.float(1.5, "Volume Threshold for Breakout", minval=1.0) // Volume multiplier for breakout
+pocketPivotLookback = input.int(10, "Pocket Pivot Lookback", minval=5) // Lookback for Pocket Pivot
+
+// --- VCP Detection ---
+// Find the highest high and lowest low in the lookback period
+highestPivot = ta.highest(high, lookbackPeriod)
+lowestPivot = ta.lowest(low, lookbackPeriod)
+
+// Calculate the current price range
+currentPriceRange = high - low
+
+// Corrected: Store the previous highest and lowest separately
+previousHigh = ta.highest(high[1], pivotRangeBars) // Shifted back by 1 bar
+previousLow = ta.lowest(low[1], pivotRangeBars) // Shifted back by 1 bar
+previousPriceRange = previousHigh - previousLow
+
+// Check if the range is contracting
+isRangeContracting = currentPriceRange < previousPriceRange
+
+// Volume moving average
+volumeAverage = ta.sma(volume, lookbackPeriod)
+
+// Check if volume is drying up
+isVolumeDrying = volume < volumeAverage
+
+// Define the pivot high point (resistance level)
+pivotResistance = ta.highest(high, pivotRangeBars)
+
+// Check for breakout: price crosses above pivot with high volume
+isBreakout = ta.crossover(close, pivotResistance) and volume > volumeAverage * volumeBreakoutMultiplier
+
+// --- Pocket Pivot Detection ---
+// Corrected: Declare without `var`, ensuring dynamic updates
+downDayVolume = close < close[1] ? volume : 0.0
+
+// Find the highest volume on a down day in the lookback period
+maxDownDayVolume = ta.highest(downDayVolume, pocketPivotLookback)
+
+// Pocket Pivot condition: up day with volume > max down volume
+isPocketPivotDetected = close > close[1] and volume > maxDownDayVolume
+
+// --- Plotting ---
+// Plot the pivot resistance level with a dashed line
+//plot(pivotResistance, title="Pivot Resistance", color=color.blue, style=plot.style_linebr)
+
+
+// Plot Pocket Pivots
+plotshape(series=isPocketPivotDetected, title="Pocket Pivot", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
+
+// Plot breakout signal
+plotshape(series=isBreakout, title="Breakout", style=shape.triangleup, location=location.abovebar, color=color.red, size=size.tiny)
+
+// Highlight contracting periods
+bgcolor(isRangeContracting and isVolumeDrying ? color.new(color.yellow, 90) : na, title="Contracting Zone")
+
+// --- Alerts ---
+alertcondition(condition=isBreakout, title="VCP Breakout", message="Price broke above pivot with high volume")
+alertcondition(condition=isPocketPivotDetected, title="Pocket Pivot", message="Pocket Pivot detected")
+
