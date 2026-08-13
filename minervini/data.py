@@ -100,7 +100,12 @@ def get_tickers(index):
 
 
 def _download_batch(batch, period, min_price, all_data, filtered):
-    """Download a single batch and return (new_data_dict, filtered_count)."""
+    """Download a single batch and return (new_data_dict, filtered_tickers).
+
+    Returns the list of tickers excluded by the min_price filter separately
+    from data, so the caller can distinguish price-filtered (expected) from
+    genuinely failed (throttled/dead) tickers.
+    """
     data = yf.download(
         batch,
         period=period,
@@ -111,7 +116,7 @@ def _download_batch(batch, period, min_price, all_data, filtered):
     )
 
     new_data = {}
-    new_filtered = 0
+    filtered_tickers = []
 
     if isinstance(data.columns, pd.MultiIndex):
         for ticker in batch:
@@ -121,7 +126,7 @@ def _download_batch(batch, period, min_price, all_data, filtered):
                     if min_price is not None:
                         last_close = td["Close"].iloc[-1]
                         if pd.isna(last_close) or last_close < min_price:
-                            new_filtered += 1
+                            filtered_tickers.append(ticker)
                             continue
                     new_data[ticker] = td
             except (KeyError, Exception):
@@ -131,34 +136,34 @@ def _download_batch(batch, period, min_price, all_data, filtered):
             if min_price is None or data["Close"].iloc[-1] >= min_price:
                 new_data[batch[0]] = data
             else:
-                new_filtered += 1
+                filtered_tickers.append(batch[0])
 
-    return new_data, new_filtered
+    return new_data, filtered_tickers
 
 
-def download_data(tickers, period="2y", batch_size=50, min_price=None):
+def download_data(tickers, period="2y", batch_size=25, min_price=None):
     all_data = {}
     failed = []
-    filtered = 0
+    filtered_tickers = []
     total_batches = (len(tickers) + batch_size - 1) // batch_size
 
     consecutive_failures = 0
 
-    # Main pass: moderate batches, threads=True, conditional backoff.
-    # No blind sleep between successful batches — only pause + retry when
-    # Yahoo throttles (HTTP 429 / empty result), then back off harder.
+    # Main pass: moderate batches, threads=True, modest pacing.
+    # Yahoo's chart endpoint throttles at roughly ~2,000 req/hour/IP; a flat
+    # 2s sleep between batches keeps the sustained rate sane, and we back off
+    # harder when Yahoo actually refuses (HTTP 429 / empty result).
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i : i + batch_size]
         batch_num = (i // batch_size) + 1
 
         try:
-            new_data, new_filtered = _download_batch(batch, period, min_price, all_data, filtered)
+            new_data, new_filtered = _download_batch(batch, period, min_price, all_data, filtered_tickers)
             all_data.update(new_data)
-            filtered += new_filtered
+            filtered_tickers.extend(new_filtered)
 
-            # Track failed tickers in this batch
-            batch_set = set(batch)
-            succeeded = set(new_data.keys())
+            # Track genuinely-failed tickers: not in data AND not price-filtered.
+            succeeded = set(new_data.keys()) | set(new_filtered)
             for t in batch:
                 if t not in succeeded:
                     failed.append(t)
@@ -167,20 +172,44 @@ def download_data(tickers, period="2y", batch_size=50, min_price=None):
                 consecutive_failures = 0
 
             if batch_num % 20 == 0 or batch_num == total_batches:
-                print(f"  Progress: {batch_num}/{total_batches} batches ({len(all_data)} stocks loaded, {len(failed)} failed)", flush=True)
+                print(f"  Progress: {batch_num}/{total_batches} batches ({len(all_data)} stocks loaded, {len(failed)} failed, {len(filtered_tickers)} filtered)", flush=True)
         except Exception:
             failed.extend(batch)
             consecutive_failures += 1
 
-        # Conditional rate-limit backoff: nothing when healthy, brief pause
-        # after a throttled batch, longer cooldown if Yahoo keeps refusing.
+        # Pacing: flat 2s between batches; 5s after a throttled batch;
+        # 30s cooldown if Yahoo keeps refusing.
         if consecutive_failures > 2:
             time.sleep(30.0)
         elif consecutive_failures > 0:
+            time.sleep(5.0)
+        else:
             time.sleep(2.0)
 
-    if filtered:
-        print(f"  Filtered {filtered} stocks below ${min_price}")
+    # Retry pass: only genuinely-failed tickers (throttled, not price-filtered).
+    # Retry them in small batches with a pause. Verified Aug 2026: throttled
+    # names load on retry once the burst window cools.
+    if failed:
+        print(f"  Retry pass: {len(failed)} failed tickers...", flush=True)
+        retry_pending = failed[:]
+        failed = []
+        for i in range(0, len(retry_pending), 10):
+            batch = retry_pending[i : i + 10]
+            try:
+                new_data, new_filtered = _download_batch(batch, period, min_price, all_data, filtered_tickers)
+                all_data.update(new_data)
+                filtered_tickers.extend(new_filtered)
+                succeeded = set(new_data.keys()) | set(new_filtered)
+                for t in batch:
+                    if t not in succeeded:
+                        failed.append(t)
+            except Exception:
+                failed.extend(batch)
+            time.sleep(1.5)
+        print(f"  Retry pass done: recovered {len(retry_pending) - len(failed)}, still failed {len(failed)}", flush=True)
+
+    if filtered_tickers:
+        print(f"  Filtered {len(filtered_tickers)} stocks below ${min_price}")
     return all_data, failed
 
 
