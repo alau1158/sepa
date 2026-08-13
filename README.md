@@ -51,6 +51,10 @@ python news_watchlist.py --no-email                 # print summaries to console
 python news_watchlist.py --watchlist my_list.txt    # use a different watchlist file
 ```
 
+## Sample Output
+
+Real output from the NASDAQ screen (2026-08-12) is included as [`sample_output.csv`](sample_output.csv) — see what a typical run produces before you install anything.
+
 ## Output Columns
 
 Quick reference: **higher is better** for VCP Score, EPS, RS Rating. **Lower is better** for Ind Rk. **A is better than E** for A/D.
