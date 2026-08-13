@@ -403,6 +403,9 @@ def main():
     parser.add_argument("--no-ai", action="store_true", help="Skip AI catalyst analysis")
     parser.add_argument("--output", nargs="?", const="__auto__", help="Save results to CSV (default: momentum_scan_YYYY-MM-DD.csv)")
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--full-refresh", action="store_true",
+                        help="Full 2y re-download, replace cache entirely (bypasses incremental). "
+                             "Use for weekly re-sync / split adjustments.")
     args = parser.parse_args()
 
     # Collect indices
@@ -440,8 +443,17 @@ def main():
     elif indices:
         for index in indices:
             print(f"\n=== {index.upper()} ===")
-            cache = None if args.refresh else load_cache(index)
-            if cache:
+            cache = None if (args.refresh or args.full_refresh) else load_cache(index)
+            if args.full_refresh:
+                print("  Full refresh: re-downloading 2y history (replaces cache)...", flush=True)
+                tickers = get_tickers(index)
+                if not tickers:
+                    continue
+                min_price = 15 if index in ("nasdaq", "nyse") else None
+                data_dict, failed, filtered = download_data(tickers, min_price=min_price)
+                print(f"  Full refresh done: {len(data_dict)} stocks, {len(failed)} failed", flush=True)
+                save_cache(index, tickers, data_dict, failed, filtered)
+            elif cache:
                 data_dict = cache["data"]
             elif args.refresh:
                 print("  Refreshing cache (incremental)...", flush=True)
