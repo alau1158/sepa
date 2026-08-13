@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 
-from minervini.data import get_tickers, download_data, save_cache, load_cache, get_benchmark
+from minervini.data import get_tickers, download_data, save_cache, load_cache, get_benchmark, incremental_refresh
 from minervini.screener import screen_stocks
 from minervini.emailer import send_email
 
@@ -66,7 +66,7 @@ def main():
         if cache:
             data_dict = cache["data"]
         elif args.refresh:
-            print("  Fetching ticker list...", flush=True)
+            print("  Refreshing cache (incremental)...", flush=True)
             try:
                 tickers = get_tickers(index)
             except Exception as e:
@@ -78,10 +78,9 @@ def main():
                 continue
 
             min_price = 15 if index in ("nasdaq", "nyse") else None
-            print(f"  Found {len(tickers)} stocks. Downloading data (this may take a while)...", flush=True)
-            data_dict, failed = download_data(tickers, min_price=min_price)
-            print(f"  Downloaded {len(data_dict)} stocks ({len(failed)} failed)", flush=True)
-            save_cache(index, tickers, data_dict, failed)
+            print(f"  Found {len(tickers)} stocks. Refreshing incrementally...", flush=True)
+            data_dict, failed = incremental_refresh(index, tickers, min_price=min_price)
+            print(f"  Refreshed {len(data_dict)} stocks ({len(failed)} failed)", flush=True)
         else:
             print(f"  No cached data for {index}. Use --refresh to download.")
             continue

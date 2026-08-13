@@ -210,7 +210,7 @@ def download_data(tickers, period="2y", batch_size=25, min_price=None):
 
     if filtered_tickers:
         print(f"  Filtered {len(filtered_tickers)} stocks below ${min_price}")
-    return all_data, failed
+    return all_data, failed, filtered_tickers
 
 
 SPY_CACHE_FILE = os.path.join(CACHE_DIR, "cache_spy.pkl")
@@ -247,11 +247,12 @@ def get_benchmark(period="2y", force_refresh=False):
 CACHE_FILE = os.path.join(CACHE_DIR, "cache_{}.pkl")
 
 
-def save_cache(index, tickers, data, failed=None):
+def save_cache(index, tickers, data, failed=None, filtered=None):
     cache = {
         "tickers": tickers,
         "data": data,
         "failed": failed or [],
+        "filtered": filtered or [],
         "timestamp": datetime.now(),
         "index": index,
     }
@@ -280,3 +281,89 @@ def load_cache(index, max_age_hours=168):
         return cache
     except (FileNotFoundError, Exception):
         return None
+
+
+def incremental_refresh(index, tickers, period="1mo", batch_size=25, min_price=None):
+    """Incremental cache refresh: keep the existing 2y history and only
+    download a recent window (default 1mo) to append to it.
+
+    Strategy:
+    - Load the existing cache (2y history from previous full runs).
+    - Split tickers: known (already in cache) vs new (missing).
+    - Known tickers: download only `period` of fresh bars, merge with the
+      cached history (concat + dedupe on the date index, keep newest).
+    - New tickers: full 2y download (backfill for IPOs / new listings).
+    - Price filter (min_price) applies to the MERGED last close, not the
+      fresh window, so a stock that dropped under $15 since the last run
+      is still caught.
+    - Tickers that fail the incremental pull keep their cached history
+      instead of vanishing (old behavior dropped them entirely).
+
+    Returns (all_data, failed) where all_data has full OHLCV history.
+    """
+    cache = load_cache(index)
+    old_data = cache["data"] if cache else {}
+    old_failed = set(cache.get("failed", [])) if cache else set()
+    old_filtered = set(cache.get("filtered", [])) if cache else set()
+
+    # Known: already in cache with data → incremental pull.
+    known = [t for t in tickers if t in old_data and not old_data[t].empty]
+    # New: not in cache AND not previously price-filtered → full backfill.
+    # Previously-filtered (sub-$15) names are skipped: re-downloading them
+    # every run just to filter them again is wasted requests. A periodic
+    # full refresh (--full-refresh) re-checks them for $15 crossings.
+    new = [t for t in tickers if t not in old_data and t not in old_filtered]
+    skipped_filtered = [t for t in tickers if t not in old_data and t in old_filtered]
+
+    print(f"  Incremental refresh: {len(known)} known, {len(new)} new, {len(skipped_filtered)} previously-filtered (skipped)", flush=True)
+
+    all_data = {}
+    failed = []
+    filtered_out = list(old_filtered)
+
+    # ── 1. New tickers: full history backfill ──
+    if new:
+        print(f"  Backfilling {len(new)} new tickers (full history)...", flush=True)
+        new_data, new_failed, new_filtered = download_data(new, period="2y", batch_size=batch_size, min_price=min_price)
+        all_data.update(new_data)
+        failed.extend(new_failed)
+        filtered_out.extend(new_filtered)
+
+    # ── 2. Known tickers: fresh window only, merge into cache ──
+    if known:
+        print(f"  Fetching recent data for {len(known)} known tickers ({period})...", flush=True)
+        fresh_data, fresh_failed, fresh_filtered = download_data(known, period=period, batch_size=batch_size, min_price=None)
+        # failed here means the incremental pull failed for that ticker —
+        # keep its cached history instead of dropping it.
+        failed.extend(fresh_failed)
+
+        for t in known:
+            cached = old_data.get(t)
+            fresh = fresh_data.get(t)
+
+            # No fresh bars (delisted/suspended): keep cached history.
+            if fresh is None or fresh.empty:
+                if cached is not None and not cached.empty:
+                    all_data[t] = cached
+                else:
+                    failed.append(t)
+                continue
+
+            # Merge: cached history + fresh bars, dedupe on date, newest wins.
+            merged = pd.concat([cached, fresh]) if cached is not None else fresh
+            merged = merged[~merged.index.duplicated(keep="last")].sort_index()
+
+            # Apply the price filter on the merged last close.
+            if min_price is not None:
+                close_series = pd.Series(merged["Close"]).dropna()
+                last_close = float(close_series.iloc[-1]) if len(close_series) else float("nan")
+                if pd.isna(last_close) or last_close < min_price:
+                    filtered_out.append(t)
+                    continue  # dropped from cache, not counted as failed
+
+            all_data[t] = merged
+
+    # ── 3. Save ──
+    save_cache(index, tickers, all_data, failed, filtered_out)
+    print(f"  Incremental refresh done: {len(all_data)} stocks, {len(failed)} failed, {len(filtered_out)} filtered", flush=True)
+    return all_data, failed

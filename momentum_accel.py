@@ -13,7 +13,7 @@ import yfinance as yf
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from minervini.data import get_tickers, download_data, save_cache, load_cache
+from minervini.data import get_tickers, download_data, save_cache, load_cache, incremental_refresh
 
 
 def compute_score(df):
@@ -431,7 +431,7 @@ def main():
             print("No tickers in watchlist.")
             return
         print(f"Scanning watchlist: {', '.join(tickers)}")
-        data_dict, failed = download_data(tickers, min_price=None)
+        data_dict, failed, _ = download_data(tickers, min_price=None)
         print(f"  Got data for {len(data_dict)} stocks ({len(failed)} failed)")
         results = get_results(data_dict, min_score=args.min_score)
         all_results = results
@@ -444,14 +444,13 @@ def main():
             if cache:
                 data_dict = cache["data"]
             elif args.refresh:
-                print("  Downloading...", flush=True)
+                print("  Refreshing cache (incremental)...", flush=True)
                 tickers = get_tickers(index)
                 if not tickers:
                     continue
                 min_price = 15 if index in ("nasdaq", "nyse") else None
-                data_dict, failed = download_data(tickers, min_price=min_price)
-                print(f"  Downloaded {len(data_dict)} stocks", flush=True)
-                save_cache(index, tickers, data_dict, failed)
+                data_dict, failed = incremental_refresh(index, tickers, min_price=min_price)
+                print(f"  Refreshed {len(data_dict)} stocks", flush=True)
             else:
                 print(f"  No cached data for {index}. Use --refresh to download.")
                 continue
