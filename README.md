@@ -138,6 +138,19 @@ Weights are derived from a 10-year backtest (2016–2026, 341K observations). Ke
 - **Already Broken Out** = close > pivot level × 1.02 — flagged separately instead of scored.
 - `Dist to Pivot%` comes from the same detection: positive = below the pivot, negative = already above it. The pivot is the **prior** 52-week high (today's bar deliberately excluded) so pre-breakout names keep a positive distance.
 
+### Backtest Validation (July 2026)
+
+The VCP engine was validated with a 10-year walk-forward backtest before the scoring weights were trusted: **1,000 tickers, 341K+ observations (2017–2025)**, running `detect_vcp()` weekly and measuring forward returns and breakout rates.
+
+What it showed:
+
+- VCP Tight stocks broke out (above pivot +2%) at **3–4× the rate** of the general universe — 21.6% vs 4.7% in 5 days; 46.9% vs 14.4% in 21 days
+- VCP Tight had **3.5× lower volatility** than the broad market with a better Sharpe (0.15 vs 0.13) and better tail-risk (VaR95 −14% vs −24%)
+- The v4.0 scoring weights in `minervini/vcp.py` are derived directly from these findings — components with zero or inverted predictive power (base duration, binary halving rule, volume dry-up as a hard gate) were removed or reweighted
+- Best combo found: **within 2% of pivot + 2–3 contractions → 50.9% 10-day breakout rate**, stable across 7 of 9 years
+
+Backtest scripts live in `/home/alau/training_data/` (`backtest_vcp_skill.py`, `investigate_vcp_v2.py`). Honest caveat: this is a **timing tool, not a return predictor** — breakout timing was stable, but forward returns were negative in bear years (2018, 2020, 2022).
+
 ### Pullback to MA (Re-Entry / Add Setup)
 
 `pullback.py` detects stocks that broke out / ran up and are now pulling back toward the 20d or 50d SMA on declining volume — a classic re-entry or add-to-position setup.
