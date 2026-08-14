@@ -495,9 +495,9 @@ LICENSE             — MIT
 
 - yfinance
 - pandas
+- numpy
 - requests
 - lxml
-- tqdm
 - python-dotenv
 - openai (watchlist news summarizer only)
 - gspread (portfolio journal / news ticker source)
