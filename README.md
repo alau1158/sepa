@@ -149,7 +149,7 @@ What it showed:
 - The v4.0 scoring weights in `minervini/vcp.py` are derived directly from these findings — components with zero or inverted predictive power (base duration, binary halving rule, volume dry-up as a hard gate) were removed or reweighted
 - Best combo found: **within 2% of pivot + 2–3 contractions → 50.9% 10-day breakout rate**, stable across 7 of 9 years
 
-Backtest scripts live in `/home/alau/training_data/` (`backtest_vcp_skill.py`, `investigate_vcp_v2.py`). Honest caveat: this is a **timing tool, not a return predictor** — breakout timing was stable, but forward returns were negative in bear years (2018, 2020, 2022).
+Honest caveat: this is a **timing tool, not a return predictor** — breakout timing was stable, but forward returns were negative in bear years (2018, 2020, 2022).
 
 ### Pullback to MA (Re-Entry / Add Setup)
 
